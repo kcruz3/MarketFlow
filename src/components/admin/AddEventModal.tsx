@@ -1,0 +1,771 @@
+import React, { useState, useEffect } from "react";
+import { useVendors } from "../../hooks/useVendors";
+import { MarketEvent } from "../../hooks/useMarketEvents";
+import Parse from "../../lib/parse";
+import AdminMapEditor from "./AdminMapEditor";
+import { BoothPosition } from "../consumer/MarketMap";
+import { parseBoothMap } from "../../hooks/useMarketEvents";
+
+interface Props {
+  onClose: () => void;
+  onSaved: () => void;
+  event?: MarketEvent; // if provided, we're editing
+}
+
+type Step = "details" | "vendors" | "booths";
+
+function toDateInput(d: any): string {
+  if (!d) return "";
+  const date = d instanceof Date ? d : new Date(d);
+  return date.toISOString().split("T")[0];
+}
+
+export default function AddEventModal({
+  onClose,
+  onSaved,
+  event: editEvent,
+}: Props) {
+  const { vendors } = useVendors();
+  const isEditing = !!editEvent;
+  const [step, setStep] = useState<Step>("details");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  // Form state — pre-fill if editing
+  const [name, setName] = useState(editEvent?.name ?? "");
+  const [date, setDate] = useState(toDateInput(editEvent?.date));
+  const [endDate, setEndDate] = useState(toDateInput(editEvent?.endDate));
+  const [hours, setHours] = useState(editEvent?.hours ?? "10:00 AM – 3:00 PM");
+  const [notes, setNotes] = useState(editEvent?.notes ?? "");
+  const [isPublished, setIsPublished] = useState(
+    editEvent?.isPublished ?? false
+  );
+  const [selectedVendorSlugs, setSelectedVendorSlugs] = useState<Set<string>>(
+    new Set()
+  );
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [vendorCategoryFilter, setVendorCategoryFilter] = useState("All");
+  const [boothMap, setBoothMap] = useState<BoothPosition[]>(
+    parseBoothMap(editEvent?.boothMap)
+  );
+
+  // Load existing vendor relations when editing
+  useEffect(() => {
+    if (!editEvent) return;
+    // Re-parse boothMap from the live event in case it updated
+    setBoothMap(parseBoothMap(editEvent.boothMap));
+    const loadVendors = async () => {
+      try {
+        const query = new Parse.Query("MarketEvent");
+        const obj = await query.get(editEvent.objectId);
+        const relation = obj.relation("vendors");
+        const results = await relation.query().limit(200).find();
+        setSelectedVendorSlugs(new Set(results.map((v: any) => v.get("slug"))));
+      } catch (e) {
+        // silently fail — vendor selection just starts empty
+      }
+    };
+    loadVendors();
+  }, [editEvent]);
+
+  const VENDOR_CATEGORIES = [
+    "All",
+    "Farmers, Fishers, Foragers",
+    "Food & Beverage Producers",
+    "Prepared Food",
+  ];
+
+  const filteredVendors = vendors.filter((v) => {
+    const matchCat =
+      vendorCategoryFilter === "All" || v.category === vendorCategoryFilter;
+    const matchSearch = v.name
+      .toLowerCase()
+      .includes(vendorSearch.toLowerCase());
+    return matchCat && matchSearch;
+  });
+
+  const selectAll = () => {
+    setSelectedVendorSlugs(
+      (prev) => new Set([...prev, ...filteredVendors.map((v) => v.slug)])
+    );
+  };
+
+  const deselectAll = () => {
+    const filteredSlugs = new Set(filteredVendors.map((v) => v.slug));
+    setSelectedVendorSlugs(
+      (prev) => new Set([...prev].filter((s) => !filteredSlugs.has(s)))
+    );
+  };
+
+  const copyFromLastEvent = () => {
+    // Find the most recent past event with vendors
+    // We use the events from the hook — passed as a prop below
+    // For now just select all vendors as a fallback
+    setSelectedVendorSlugs(new Set(vendors.map((v) => v.slug)));
+  };
+
+  const toggleVendor = (slug: string) => {
+    setSelectedVendorSlugs((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) {
+        next.delete(slug);
+        const nextBooth = { ...boothMap };
+        Object.keys(nextBooth).forEach((k) => {
+          if (nextBooth[k] === slug) delete nextBooth[k];
+        });
+        setBoothMap(nextBooth);
+      } else {
+        next.add(slug);
+      }
+      return next;
+    });
+  };
+
+  const validateDetails = () => {
+    if (!name.trim()) return "Event name is required";
+    if (!date) return "Event date is required";
+    if (!hours.trim()) return "Market hours are required";
+    return null;
+  };
+
+  const handleNext = () => {
+    if (step === "details") {
+      const err = validateDetails();
+      if (err) {
+        setError(err);
+        return;
+      }
+      setError("");
+      setStep("vendors");
+    } else if (step === "vendors") {
+      setStep("booths");
+    }
+  };
+
+  const saveBoothMapOnly = async () => {
+    if (!editEvent) return;
+    setSaving(true);
+    setError("");
+    try {
+      const q = new Parse.Query("MarketEvent");
+      const obj = await q.get(editEvent.objectId);
+      // Store as keyed object so Parse preserves structure on read
+      const mapObj: Record<string, BoothPosition> = {};
+      boothMap.forEach((b, i) => {
+        mapObj[String(i)] = b;
+      });
+      obj.set("boothMap", mapObj);
+      await obj.save();
+      onSaved();
+    } catch (e: any) {
+      setError(e.message || "Failed to save map");
+      setSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      let obj: Parse.Object;
+
+      if (isEditing) {
+        const q = new Parse.Query("MarketEvent");
+        obj = await q.get(editEvent.objectId);
+      } else {
+        const MarketEvent = Parse.Object.extend("MarketEvent");
+        obj = new MarketEvent();
+      }
+
+      obj.set("name", name.trim());
+      obj.set("date", new Date(date));
+      if (endDate) obj.set("endDate", new Date(endDate));
+      obj.set("hours", hours.trim());
+      obj.set("address", "1717 Bellevue Way NE, Bellevue, WA 98004");
+      obj.set("notes", notes.trim());
+      obj.set("isPublished", isPublished);
+      const boothMapObj: Record<string, BoothPosition> = {};
+      boothMap.forEach((b, i) => {
+        boothMapObj[String(i)] = b;
+      });
+      obj.set("boothMap", boothMapObj);
+      await obj.save();
+
+      // Rebuild vendor relation from scratch
+      const relation = obj.relation("vendors");
+
+      if (isEditing) {
+        // Remove all existing vendors first
+        const existing = await relation.query().limit(200).find();
+        if (existing.length > 0) relation.remove(existing);
+      }
+
+      if (selectedVendorSlugs.size > 0) {
+        const vendorQuery = new Parse.Query("Vendor");
+        vendorQuery.containedIn("slug", Array.from(selectedVendorSlugs));
+        vendorQuery.limit(200);
+        const vendorObjects = await vendorQuery.find();
+        relation.add(vendorObjects);
+      }
+
+      await obj.save();
+      onSaved();
+    } catch (e: any) {
+      setError(e.message || "Failed to save event");
+      setSaving(false);
+    }
+  };
+
+  const selectedVendors = vendors.filter((v) =>
+    selectedVendorSlugs.has(v.slug)
+  );
+
+  return (
+    <div
+      style={s.overlay}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div style={s.modal}>
+        {/* Header */}
+        <div style={s.header}>
+          <h2 style={s.title}>
+            {isEditing ? `Edit: ${editEvent.name}` : "Add Market Event"}
+          </h2>
+          <button onClick={onClose} style={s.closeBtn}>
+            ✕
+          </button>
+        </div>
+
+        {/* Steps */}
+        <div style={s.steps}>
+          {(["details", "vendors", "booths"] as Step[]).map((st, i) => {
+            const stepIndex = ["details", "vendors", "booths"].indexOf(step);
+            const isDone = i < stepIndex;
+            const isCurrent = step === st;
+            return (
+              <div
+                key={st}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <div
+                  style={{
+                    ...s.stepDot,
+                    background: isCurrent
+                      ? "var(--forest-mid)"
+                      : isDone
+                      ? "var(--forest-light)"
+                      : "var(--cream-dark)",
+                    color: isCurrent || isDone ? "white" : "var(--text-muted)",
+                    cursor: isDone ? "pointer" : "default",
+                  }}
+                  onClick={() => isDone && setStep(st)}
+                >
+                  {isDone ? "✓" : i + 1}
+                </div>
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: isCurrent ? "var(--forest)" : "var(--text-muted)",
+                    fontWeight: isCurrent ? 500 : 400,
+                    textTransform: "capitalize",
+                    cursor: isDone ? "pointer" : "default",
+                  }}
+                  onClick={() => isDone && setStep(st)}
+                >
+                  {st}
+                </span>
+                {i < 2 && (
+                  <span style={{ color: "var(--cream-dark)", margin: "0 4px" }}>
+                    ›
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Body */}
+        <div style={s.body}>
+          {error && <div style={s.error}>{error}</div>}
+
+          {/* Step 1: Details */}
+          {step === "details" && (
+            <div style={s.fields}>
+              <div style={s.field}>
+                <label style={s.label}>Event name *</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Opening Day 2026"
+                  style={s.input}
+                />
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 16,
+                }}
+              >
+                <div style={s.field}>
+                  <label style={s.label}>Date *</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    style={s.input}
+                  />
+                </div>
+                <div style={s.field}>
+                  <label style={s.label}>
+                    End date <span style={s.opt}>(optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    style={s.input}
+                  />
+                </div>
+              </div>
+              <div style={s.field}>
+                <label style={s.label}>Market hours *</label>
+                <input
+                  value={hours}
+                  onChange={(e) => setHours(e.target.value)}
+                  placeholder="10:00 AM – 3:00 PM"
+                  style={s.input}
+                />
+              </div>
+              <div style={s.field}>
+                <label style={s.label}>
+                  Notes <span style={s.opt}>(optional)</span>
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Any special notes for this market day..."
+                  rows={3}
+                  style={{ ...s.input, resize: "vertical" }}
+                />
+              </div>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  cursor: "pointer",
+                  fontSize: 14,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isPublished}
+                  onChange={(e) => setIsPublished(e.target.checked)}
+                />
+                <span>
+                  Publish <span style={s.opt}>(visible to customers)</span>
+                </span>
+              </label>
+            </div>
+          )}
+
+          {/* Step 2: Vendors */}
+          {step === "vendors" && (
+            <div>
+              {/* Toolbar */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginBottom: 14,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="Search vendors..."
+                  value={vendorSearch}
+                  onChange={(e) => setVendorSearch(e.target.value)}
+                  style={{
+                    ...s.input,
+                    flex: 1,
+                    minWidth: 160,
+                    padding: "7px 12px",
+                  }}
+                />
+                <button
+                  onClick={selectAll}
+                  style={{
+                    ...s.chipBtn,
+                    background: "var(--sage-pale)",
+                    color: "var(--forest-mid)",
+                    borderColor: "var(--sage-light)",
+                  }}
+                >
+                  Select all
+                </button>
+                <button onClick={deselectAll} style={{ ...s.chipBtn }}>
+                  Deselect all
+                </button>
+                <button onClick={copyFromLastEvent} style={{ ...s.chipBtn }}>
+                  Select all vendors
+                </button>
+              </div>
+
+              {/* Category filters */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  marginBottom: 14,
+                  flexWrap: "wrap",
+                }}
+              >
+                {VENDOR_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setVendorCategoryFilter(cat)}
+                    style={{
+                      padding: "4px 12px",
+                      borderRadius: 20,
+                      border: "1.5px solid",
+                      borderColor:
+                        vendorCategoryFilter === cat
+                          ? "var(--forest-mid)"
+                          : "var(--cream-dark)",
+                      background:
+                        vendorCategoryFilter === cat
+                          ? "var(--forest-mid)"
+                          : "var(--white)",
+                      color:
+                        vendorCategoryFilter === cat
+                          ? "white"
+                          : "var(--text-secondary)",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      fontFamily: "Nunito, sans-serif",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {cat === "Farmers, Fishers, Foragers"
+                      ? "Farmers"
+                      : cat === "Food & Beverage Producers"
+                      ? "Producers"
+                      : cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Count */}
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-muted)",
+                  marginBottom: 12,
+                }}
+              >
+                <strong style={{ color: "var(--forest)" }}>
+                  {selectedVendorSlugs.size}
+                </strong>{" "}
+                of {vendors.length} vendors selected
+                {filteredVendors.length !== vendors.length &&
+                  ` · showing ${filteredVendors.length}`}
+              </p>
+
+              <div style={s.vendorGrid}>
+                {filteredVendors.map((v) => {
+                  const isSelected = selectedVendorSlugs.has(v.slug);
+                  return (
+                    <div
+                      key={v.slug}
+                      onClick={() => toggleVendor(v.slug)}
+                      style={{
+                        ...s.vendorChip,
+                        background: isSelected
+                          ? "var(--sage-pale)"
+                          : "var(--cream)",
+                        borderColor: isSelected
+                          ? "var(--forest-mid)"
+                          : "var(--cream-dark)",
+                        color: isSelected
+                          ? "var(--forest)"
+                          : "var(--text-secondary)",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 10,
+                          marginBottom: 2,
+                          display: "block",
+                          opacity: 0.55,
+                        }}
+                      >
+                        {v.subcategory ||
+                          (v.category === "Farmers, Fishers, Foragers"
+                            ? "Farmer"
+                            : v.category === "Food & Beverage Producers"
+                            ? "Producer"
+                            : "Prepared")}
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: isSelected ? 600 : 400,
+                          fontSize: 13,
+                        }}
+                      >
+                        {v.name}
+                      </span>
+                      {isSelected && (
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 5,
+                            right: 6,
+                            fontSize: 11,
+                            color: "var(--forest-mid)",
+                            fontWeight: 700,
+                          }}
+                        >
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {filteredVendors.length === 0 && (
+                  <div
+                    style={{
+                      gridColumn: "1/-1",
+                      textAlign: "center",
+                      padding: "24px",
+                      color: "var(--text-muted)",
+                      fontSize: 13,
+                    }}
+                  >
+                    No vendors match your search
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Booth map */}
+          {step === "booths" && (
+            <div>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "var(--text-secondary)",
+                  marginBottom: 16,
+                }}
+              >
+                Click a booth to assign a vendor. Only vendors selected in step
+                2 are available.
+              </p>
+              <AdminMapEditor
+                vendors={selectedVendors}
+                initialBooths={boothMap}
+                onChange={setBoothMap}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={s.footer}>
+          <button onClick={onClose} style={s.cancelBtn} disabled={saving}>
+            Cancel
+          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            {step !== "details" && (
+              <button
+                onClick={() =>
+                  setStep(step === "booths" ? "vendors" : "details")
+                }
+                style={s.backBtn}
+                disabled={saving}
+              >
+                ← Back
+              </button>
+            )}
+            {step !== "booths" ? (
+              <button onClick={handleNext} style={s.nextBtn}>
+                Next →
+              </button>
+            ) : (
+              <button onClick={handleSave} style={s.saveBtn} disabled={saving}>
+                {saving
+                  ? "Saving..."
+                  : isEditing
+                  ? "✓ Save Changes"
+                  : "✓ Create Event"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const s: Record<string, React.CSSProperties> = {
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    padding: "16px 12px",
+  },
+  modal: {
+    background: "var(--white)",
+    borderRadius: 16,
+    width: "100%",
+    maxWidth: 1100,
+    maxHeight: "92vh",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+  },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "24px 28px 16px",
+    borderBottom: "1px solid var(--cream-dark)",
+  },
+  title: {
+    fontFamily: "Playfair Display, serif",
+    fontSize: 22,
+    color: "var(--forest)",
+  },
+  closeBtn: {
+    background: "none",
+    border: "none",
+    fontSize: 18,
+    cursor: "pointer",
+    color: "var(--text-muted)",
+    padding: "4px 8px",
+  },
+  steps: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "16px 28px",
+    borderBottom: "1px solid var(--cream-dark)",
+    background: "var(--cream)",
+  },
+  stepDot: {
+    width: 22,
+    height: 22,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 11,
+    fontWeight: 600,
+  },
+  body: { flex: 1, overflowY: "auto", padding: "24px 28px" },
+  error: {
+    background: "#fff0f0",
+    border: "1px solid #ffcdd2",
+    borderRadius: 8,
+    padding: "10px 14px",
+    fontSize: 13,
+    color: "#c62828",
+    marginBottom: 16,
+  },
+  fields: { display: "flex", flexDirection: "column", gap: 18 },
+  field: { display: "flex", flexDirection: "column", gap: 6 },
+  label: { fontSize: 13, fontWeight: 500, color: "var(--text-primary)" },
+  opt: { fontWeight: 400, color: "var(--text-muted)", fontSize: 12 },
+  input: {
+    padding: "9px 14px",
+    borderRadius: 8,
+    border: "1px solid var(--cream-dark)",
+    fontSize: 14,
+    outline: "none",
+    fontFamily: "DM Sans, sans-serif",
+    background: "var(--cream)",
+    color: "var(--text-primary)",
+  },
+  vendorGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+    gap: 8,
+  },
+  chipBtn: {
+    padding: "6px 13px",
+    borderRadius: 8,
+    border: "1px solid var(--cream-dark)",
+    background: "var(--white)",
+    color: "var(--text-secondary)",
+    fontSize: 12,
+    cursor: "pointer",
+    fontFamily: "Nunito, sans-serif",
+    fontWeight: 600,
+    whiteSpace: "nowrap" as const,
+  },
+  vendorChip: {
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "1px solid",
+    cursor: "pointer",
+    transition: "all 0.1s",
+    position: "relative",
+  },
+  footer: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "16px 28px",
+    borderTop: "1px solid var(--cream-dark)",
+    background: "var(--cream)",
+  },
+  cancelBtn: {
+    padding: "9px 18px",
+    borderRadius: 8,
+    border: "1px solid var(--cream-dark)",
+    background: "white",
+    fontSize: 14,
+    color: "var(--text-secondary)",
+    cursor: "pointer",
+    fontFamily: "DM Sans, sans-serif",
+  },
+  backBtn: {
+    padding: "9px 18px",
+    borderRadius: 8,
+    border: "1px solid var(--cream-dark)",
+    background: "white",
+    fontSize: 14,
+    color: "var(--text-secondary)",
+    cursor: "pointer",
+    fontFamily: "DM Sans, sans-serif",
+  },
+  nextBtn: {
+    padding: "9px 22px",
+    borderRadius: 8,
+    border: "none",
+    background: "var(--forest-mid)",
+    color: "white",
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: "pointer",
+    fontFamily: "DM Sans, sans-serif",
+  },
+  saveBtn: {
+    padding: "9px 22px",
+    borderRadius: 8,
+    border: "none",
+    background: "var(--wheat)",
+    color: "white",
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: "pointer",
+    fontFamily: "DM Sans, sans-serif",
+  },
+};

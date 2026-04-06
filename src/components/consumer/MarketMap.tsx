@@ -1,0 +1,430 @@
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { IconLeaf, IconJar, IconUtensilsCrossed, IconMap } from "../Icons";
+
+export interface BoothPosition {
+  vendorSlug: string;
+  vendorName: string;
+  category: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  boothId: string;
+}
+
+interface Props {
+  booths: BoothPosition[];
+  width?: number;
+  height?: number;
+}
+
+const CATEGORY_COLORS: Record<
+  string,
+  { fill: string; stroke: string; text: string }
+> = {
+  "Farmers, Fishers, Foragers": {
+    fill: "#e8f0e9",
+    stroke: "#2d5a3d",
+    text: "#1a3a2a",
+  },
+  "Food & Beverage Producers": {
+    fill: "#fef3dc",
+    stroke: "#c8841a",
+    text: "#5c3d1e",
+  },
+  "Prepared Food": { fill: "#fbeae7", stroke: "#c8441a", text: "#5c1e1e" },
+  default: { fill: "#f1efea", stroke: "#888780", text: "#444441" },
+};
+
+function getCategoryColor(category: string) {
+  return CATEGORY_COLORS[category] ?? CATEGORY_COLORS["default"];
+}
+
+function truncate(str: string, max: number) {
+  return str.length > max ? str.slice(0, max - 1) + "…" : str;
+}
+
+export default function MarketMap({
+  booths,
+  width = 800,
+  height = 520,
+}: Props) {
+  const navigate = useNavigate();
+  const [selected, setSelected] = useState<BoothPosition | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // Close panel on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (svgRef.current && !svgRef.current.contains(e.target as Node)) {
+        setSelected(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const PADDING = 40;
+  const AISLE_W = 24;
+  const ENTRANCE_Y = height - 40;
+
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      {/* Legend */}
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          flexWrap: "wrap",
+          marginBottom: 12,
+          fontSize: 12,
+          color: "var(--text-secondary)",
+        }}
+      >
+        {Object.entries(CATEGORY_COLORS)
+          .filter(([k]) => k !== "default")
+          .map(([cat, col]) => (
+            <div
+              key={cat}
+              style={{ display: "flex", alignItems: "center", gap: 5 }}
+            >
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: 3,
+                  background: col.fill,
+                  border: `1.5px solid ${col.stroke}`,
+                }}
+              />
+              <span>
+                {cat === "Farmers, Fishers, Foragers"
+                  ? "Farmers"
+                  : cat === "Food & Beverage Producers"
+                  ? "Producers"
+                  : "Prepared Food"}
+              </span>
+            </div>
+          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <div
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: 3,
+              background: "#e1f5ee",
+              border: "1.5px solid #1D9E75",
+            }}
+          />
+          <span>Selected</span>
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          overflow: "auto",
+          borderRadius: 12,
+          border: "1px solid var(--cream-dark)",
+          background: "#f9f6f0",
+        }}
+      >
+        <svg
+          ref={svgRef}
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          style={{ display: "block", minWidth: width }}
+          onClick={() => setSelected(null)}
+        >
+          {/* Background */}
+          <rect width={width} height={height} fill="#f9f6f0" />
+
+          {/* Path / ground markings */}
+          <rect
+            x={PADDING}
+            y={PADDING}
+            width={width - PADDING * 2}
+            height={height - PADDING * 2}
+            fill="none"
+            stroke="#d8d0c4"
+            strokeWidth="1"
+            strokeDasharray="6 4"
+            rx="8"
+          />
+
+          {/* Entrance indicator */}
+          <rect
+            x={width / 2 - 50}
+            y={ENTRANCE_Y - 4}
+            width={100}
+            height={28}
+            rx={6}
+            fill="#1a3a2a"
+          />
+          <text
+            x={width / 2}
+            y={ENTRANCE_Y + 12}
+            textAnchor="middle"
+            fill="white"
+            fontSize="11"
+            fontFamily="DM Sans, sans-serif"
+            fontWeight="600"
+            letterSpacing="1.2"
+          >
+            ENTRANCE
+          </text>
+
+          {/* Center aisle hint */}
+          <line
+            x1={width / 2}
+            y1={PADDING + 10}
+            x2={width / 2}
+            y2={ENTRANCE_Y - 10}
+            stroke="#d8d0c4"
+            strokeWidth="1"
+            strokeDasharray="4 6"
+          />
+
+          {/* Empty state */}
+          {booths.length === 0 && (
+            <>
+              <text
+                x={width / 2}
+                y={height / 2 - 16}
+                textAnchor="middle"
+                fill="#9a9a8a"
+                fontSize="14"
+                fontFamily="DM Sans, sans-serif"
+              >
+                No booths published
+              </text>
+              <text
+                x={width / 2}
+                y={height / 2 + 16}
+                textAnchor="middle"
+                fill="#9a9a8a"
+                fontSize="14"
+                fontFamily="DM Sans, sans-serif"
+              >
+                Booth layout not published yet
+              </text>
+            </>
+          )}
+
+          {/* Booth cells */}
+          {booths.map((booth) => {
+            const isSelected = selected?.boothId === booth.boothId;
+            const isHovered = hovered === booth.boothId;
+            const col = getCategoryColor(booth.category);
+
+            const fillColor = isSelected
+              ? "#e1f5ee"
+              : isHovered
+              ? col.fill
+              : col.fill;
+            const strokeColor = isSelected ? "#1D9E75" : col.stroke;
+            const strokeWidth = isSelected ? 2.5 : isHovered ? 2 : 1.5;
+            const labelLines = booth.vendorName.split(" ");
+            const line1 = truncate(
+              labelLines.slice(0, Math.ceil(labelLines.length / 2)).join(" "),
+              14
+            );
+            const line2 = truncate(
+              labelLines.slice(Math.ceil(labelLines.length / 2)).join(" "),
+              14
+            );
+            const cx = booth.x + booth.w / 2;
+            const cy = booth.y + booth.h / 2;
+            const fontSize = booth.w < 80 ? 9 : 10;
+
+            return (
+              <g
+                key={booth.boothId}
+                style={{ cursor: "pointer" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelected(isSelected ? null : booth);
+                }}
+                onMouseEnter={() => setHovered(booth.boothId)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <rect
+                  x={booth.x}
+                  y={booth.y}
+                  width={booth.w}
+                  height={booth.h}
+                  rx={6}
+                  fill={fillColor}
+                  stroke={strokeColor}
+                  strokeWidth={strokeWidth}
+                  style={{ transition: "all 0.15s" }}
+                />
+                {/* Booth ID label */}
+                <text
+                  x={booth.x + 5}
+                  y={booth.y + 11}
+                  fill={col.stroke}
+                  fontSize="9"
+                  fontFamily="DM Sans, sans-serif"
+                  fontWeight="600"
+                  opacity="0.7"
+                >
+                  {booth.boothId}
+                </text>
+                {/* Vendor name */}
+                {booth.h >= 40 ? (
+                  <>
+                    <text
+                      x={cx}
+                      y={line2 ? cy - 6 : cy}
+                      textAnchor="middle"
+                      fill={col.text}
+                      fontSize={fontSize}
+                      fontFamily="DM Sans, sans-serif"
+                      fontWeight="500"
+                      dominantBaseline="central"
+                    >
+                      {line1}
+                    </text>
+                    {line2 && (
+                      <text
+                        x={cx}
+                        y={cy + 8}
+                        textAnchor="middle"
+                        fill={col.text}
+                        fontSize={fontSize}
+                        fontFamily="DM Sans, sans-serif"
+                        fontWeight="500"
+                        dominantBaseline="central"
+                      >
+                        {line2}
+                      </text>
+                    )}
+                  </>
+                ) : (
+                  <text
+                    x={cx}
+                    y={cy}
+                    textAnchor="middle"
+                    fill={col.text}
+                    fontSize={fontSize}
+                    fontFamily="DM Sans, sans-serif"
+                    fontWeight="500"
+                    dominantBaseline="central"
+                  >
+                    {truncate(booth.vendorName, 12)}
+                  </text>
+                )}
+                {/* Selected ring pulse */}
+                {isSelected && (
+                  <rect
+                    x={booth.x - 3}
+                    y={booth.y - 3}
+                    width={booth.w + 6}
+                    height={booth.h + 6}
+                    rx={8}
+                    fill="none"
+                    stroke="#1D9E75"
+                    strokeWidth="1.5"
+                    opacity="0.4"
+                    strokeDasharray="4 3"
+                  />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Vendor popover panel */}
+        {selected && (
+          <div
+            style={{
+              position: "absolute",
+              top: Math.min(selected.y, height - 220),
+              left:
+                selected.x + selected.w + 12 > width - 200
+                  ? selected.x - 212
+                  : selected.x + selected.w + 12,
+              width: 200,
+              background: "white",
+              borderRadius: 12,
+              border: "1px solid var(--cream-dark)",
+              boxShadow: "0 8px 24px rgba(26,58,42,0.15)",
+              padding: 16,
+              zIndex: 10,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.8px",
+                marginBottom: 4,
+              }}
+            >
+              Booth {selected.boothId}
+            </div>
+            <div
+              style={{
+                fontFamily: "Playfair Display, serif",
+                fontSize: 15,
+                color: "var(--green-deep)",
+                marginBottom: 4,
+                lineHeight: 1.3,
+              }}
+            >
+              {selected.vendorName}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-muted)",
+                marginBottom: 12,
+              }}
+            >
+              {selected.category === "Farmers, Fishers, Foragers"
+                ? "Farmer"
+                : selected.category === "Food & Beverage Producers"
+                ? "Producer"
+                : "Prepared Food"}
+            </div>
+            <button
+              onClick={() => navigate(`/vendors/${selected.vendorSlug}`)}
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: 8,
+                border: "none",
+                background: "var(--green-mid)",
+                color: "white",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: "DM Sans, sans-serif",
+              }}
+            >
+              View vendor →
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--text-muted)",
+          marginTop: 8,
+          textAlign: "center",
+        }}
+      >
+        Click any booth to see vendor details
+      </div>
+    </div>
+  );
+}

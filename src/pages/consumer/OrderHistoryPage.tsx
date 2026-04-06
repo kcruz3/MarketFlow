@@ -1,0 +1,206 @@
+import React, { useState } from 'react';
+import { useAuthContext } from '../../context/AuthContext';
+import { useCustomerOrders, Order, OrderItem, OrderStatus } from '../../hooks/useOrders';
+import { IconShoppingCart, IconQrCode, IconClock } from '../../components/Icons';
+
+const STATUS_STYLES: Record<OrderStatus, { bg: string; color: string; label: string }> = {
+  pending:   { bg: 'var(--wheat-pale)', color: 'var(--bark)', label: 'Pending' },
+  confirmed: { bg: 'var(--sage-pale)', color: 'var(--forest-mid)', label: 'Confirmed' },
+  ready:     { bg: '#e8f5e9', color: '#2e7d32', label: 'Ready for pickup' },
+  fulfilled: { bg: 'var(--cream-mid)', color: 'var(--text-secondary)', label: 'Fulfilled' },
+  cancelled: { bg: '#fdecea', color: '#c62828', label: 'Cancelled' },
+};
+
+function QRDisplay({ code }: { code: string }) {
+  return (
+    <div style={{
+      background: 'var(--forest)',
+      borderRadius: 12,
+      padding: '16px 20px',
+      textAlign: 'center',
+      minWidth: 140,
+    }}>
+      <div style={{ marginBottom: 8, opacity: 0.5, display: 'flex', justifyContent: 'center' }}>
+        <IconQrCode size={36} color="white" />
+      </div>
+      <div style={{
+        fontFamily: 'monospace',
+        fontSize: 15,
+        fontWeight: 700,
+        color: 'var(--wheat-light)',
+        letterSpacing: 2,
+      }}>
+        {code}
+      </div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '1px' }}>
+        Show at booth
+      </div>
+    </div>
+  );
+}
+
+function OrderCard({ order }: { order: Order }) {
+  const [expanded, setExpanded] = useState(false);
+  const status = STATUS_STYLES[order.status];
+  const date = new Date(order.createdAt);
+  const isActive = !['fulfilled', 'cancelled'].includes(order.status);
+
+  return (
+    <div style={{
+      background: 'var(--white)',
+      borderRadius: 14,
+      border: `1px solid ${isActive ? 'var(--sage-light)' : 'var(--cream-dark)'}`,
+      overflow: 'hidden',
+      transition: 'border-color 0.15s',
+    }}>
+      {/* Header */}
+      <div
+        style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <span style={{ fontFamily: 'Playfair Display, serif', fontSize: 15, color: 'var(--forest)', fontWeight: 700 }}>
+              {order.vendorName}
+            </span>
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
+              background: status.bg, color: status.color,
+            }}>
+              {status.label}
+            </span>
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <span>{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <IconClock size={11} color="var(--text-muted)" /> {order.pickupWindow}
+            </span>
+            <span>{(order.items as OrderItem[]).length} item{(order.items as OrderItem[]).length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 19, color: 'var(--forest)' }}>
+            ${order.total.toFixed(2)}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>cash at pickup</div>
+        </div>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 4 }}>
+          {expanded ? '▲' : '▼'}
+        </div>
+      </div>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div style={{ borderTop: '1px solid var(--cream-mid)', padding: '16px 20px', display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {/* Items */}
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, marginBottom: 10 }}>
+              Items ordered
+            </div>
+            {(order.items as OrderItem[]).map((item, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: i < order.items.length - 1 ? '1px solid var(--cream-mid)' : 'none' }}>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 500 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Qty: {item.quantity} × ${item.price.toFixed(2)}</div>
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>${(item.price * item.quantity).toFixed(2)}</div>
+              </div>
+            ))}
+            {order.notes && (
+              <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--cream)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                Note: {order.notes}
+              </div>
+            )}
+          </div>
+
+          {/* QR code — show for active orders */}
+          {isActive && (
+            <div>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, marginBottom: 10 }}>
+                Pickup code
+              </div>
+              <QRDisplay code={order.qrCode} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function OrderHistoryPage() {
+  const { user } = useAuthContext();
+  const { orders, loading } = useCustomerOrders(user?.objectId ?? '');
+  const [tab, setTab] = useState<'active' | 'past'>('active');
+
+  const activeOrders = orders.filter(o => !['fulfilled', 'cancelled'].includes(o.status));
+  const pastOrders = orders.filter(o => ['fulfilled', 'cancelled'].includes(o.status));
+  const display = tab === 'active' ? activeOrders : pastOrders;
+
+  const totalSpent = pastOrders
+    .filter(o => o.status === 'fulfilled')
+    .reduce((s, o) => s + o.total, 0);
+
+  return (
+    <div>
+      <div className="topbar">
+        <div className="topbar-title">My Orders</div>
+      </div>
+
+      <div className="page-content">
+        <div className="page-header">
+          <h2>Order History</h2>
+          <p>Track your pre-orders and pickup codes</p>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+          <div className="stat-card">
+            <div className="stat-label">Total Orders</div>
+            <div className="stat-value">{orders.length}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Active</div>
+            <div className="stat-value" style={{ color: 'var(--forest-mid)' }}>{activeOrders.length}</div>
+            <div className="stat-sub">awaiting pickup</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Total Spent</div>
+            <div className="stat-value">${totalSpent.toFixed(2)}</div>
+            <div className="stat-sub">across {pastOrders.filter(o => o.status === 'fulfilled').length} orders</div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '1px solid var(--cream-dark)' }}>
+          {(['active', 'past'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              padding: '10px 24px', borderRadius: '8px 8px 0 0', border: 'none',
+              borderBottom: tab === t ? '2px solid var(--forest-mid)' : '2px solid transparent',
+              background: tab === t ? 'var(--white)' : 'transparent',
+              color: tab === t ? 'var(--forest)' : 'var(--text-muted)',
+              fontWeight: tab === t ? 600 : 400, fontSize: 14,
+              cursor: 'pointer', fontFamily: 'Nunito, sans-serif', marginBottom: -1,
+            }}>
+              {t === 'active' ? `Active (${activeOrders.length})` : `Past (${pastOrders.length})`}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="loading-spinner">Loading orders...</div>
+        ) : display.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon"><IconShoppingCart size={40} color="var(--text-muted)" /></div>
+            <h3>{tab === 'active' ? 'No active orders' : 'No past orders'}</h3>
+            <p>{tab === 'active' ? 'Place a pre-order from any vendor page' : 'Your completed orders will appear here'}</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {display.map(order => <OrderCard key={order.objectId} order={order} />)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
