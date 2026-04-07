@@ -35,8 +35,6 @@ REACT_APP_B4A_JS_KEY=your_back4app_js_key
 ```
 
 > **Note:** The `.env` file is not committed to the repository — it's in `.gitignore` to keep the Back4App keys private. Each team member needs to create their own `.env` locally. To get the keys, reach out to Kathryn who has Back4App admin access. **Never commit the `.env` file to GitHub.**
->
-> A `.env.example` file is included in the repo as a reference for what variables are needed.
 
 ### 4. Start the development server
 
