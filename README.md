@@ -15,7 +15,7 @@ Admin and consumer platform for the South Bend Farmers Market.
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/kcruz3/MarketFlow
 cd MarketFlow
 ```
 
