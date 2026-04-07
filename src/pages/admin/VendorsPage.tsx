@@ -13,7 +13,7 @@ export default function VendorsPage() {
       <div className="page-content">
         <div className="page-header">
           <h2>Vendor Roster</h2>
-          <p>Manage all vendors for the Bellevue Farmers Market</p>
+          <p>Manage all vendors for the South Bend Farmers Market</p>
         </div>
         {loading ? (
           <div className="loading-spinner">Loading vendors...</div>

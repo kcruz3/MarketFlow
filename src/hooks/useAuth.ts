@@ -54,9 +54,9 @@ export function useAuth() {
     try {
       const role = await fetchRole(current);
       const vendorSlug =
-        role === "vendor" ? await fetchVendorSlug(current.id) : undefined;
+        role === "vendor" ? await fetchVendorSlug(current.id!) : undefined;
       setUser({
-        objectId: current.id,
+        objectId: current.id!,
         email: current.get("email"),
         username: current.get("username"),
         role,
@@ -77,9 +77,9 @@ export function useAuth() {
     const loggedIn = await Parse.User.logIn(email, password);
     const role = await fetchRole(loggedIn);
     const vendorSlug =
-      role === "vendor" ? await fetchVendorSlug(loggedIn.id) : undefined;
+      role === "vendor" ? await fetchVendorSlug(loggedIn.id!) : undefined;
     setUser({
-      objectId: loggedIn.id,
+      objectId: loggedIn.id!,
       email: loggedIn.get("email"),
       username: loggedIn.get("username"),
       role,
@@ -104,7 +104,7 @@ export function useAuth() {
     }
 
     setUser({
-      objectId: newUser.id,
+      objectId: newUser.id!,
       email: newUser.get("email"),
       username: newUser.get("username"),
       role: "customer",

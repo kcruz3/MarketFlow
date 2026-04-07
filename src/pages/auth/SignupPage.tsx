@@ -38,7 +38,7 @@ export default function SignupPage() {
       <div style={styles.card}>
         <div style={styles.logo}>
           <h1 style={styles.logoText}>MarketFlow</h1>
-          <p style={styles.logoSub}>Bellevue Farmers Market</p>
+          <p style={styles.logoSub}>South Bend Farmers Market</p>
         </div>
 
         <h2 style={styles.title}>Create an account</h2>

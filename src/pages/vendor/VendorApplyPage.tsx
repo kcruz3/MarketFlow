@@ -105,7 +105,7 @@ export default function VendorApplyPage() {
                 lineHeight: 1.6,
               }}
             >
-              Thank you for applying to Bellevue Farmers Market. Our team will
+              Thank you for applying to South Bend Farmers Market. Our team will
               review your application and get back to you within 2–3 business
               days.
             </p>

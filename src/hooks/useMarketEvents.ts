@@ -52,7 +52,7 @@ export function useMarketEvents() {
       const results = await query.find();
       setEvents(
         results.map((r) => ({
-          objectId: r.id,
+          objectId: r.id!,
           name: r.get("name") ?? "",
           date: r.get("date"),
           endDate: r.get("endDate"),

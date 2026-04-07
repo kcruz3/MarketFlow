@@ -29,7 +29,7 @@ export function useVendors(category?: string) {
   const fetchVendors = useCallback(async () => {
     setLoading(true);
     const query = new Parse.Query("Vendor");
-    query.equalTo("isActive", true);
+    // query.equalTo("isActive", true);
     query.limit(200);
     if (category) query.equalTo("category", category);
     query.ascending("name");

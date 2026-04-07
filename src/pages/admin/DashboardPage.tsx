@@ -20,7 +20,7 @@ export default function DashboardPage() {
       <div className="topbar">
         <div className="topbar-title">Admin Dashboard</div>
         <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
-          Bellevue Farmers Market · 2026 Season
+          South Bend Farmers Market · 2026 Season
         </span>
       </div>
 

@@ -26,7 +26,7 @@ export function useReviews(vendorSlug: string) {
       query.limit(50);
       const results = await query.find();
       setReviews(results.map(r => ({
-        objectId: r.id,
+        objectId: r.id!,
         vendorSlug: r.get('vendorSlug'),
         authorName: r.get('authorName'),
         authorId: r.get('authorId'),

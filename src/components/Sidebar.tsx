@@ -97,7 +97,7 @@ export default function Sidebar() {
     <>
       <div className="sidebar-logo">
         <h1>MarketFlow</h1>
-        <span>Bellevue Farmers Market</span>
+        <span>South Bend Farmers Market</span>
       </div>
 
       <div className="sidebar-section">

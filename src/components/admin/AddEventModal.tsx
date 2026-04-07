@@ -86,14 +86,14 @@ export default function AddEventModal({
 
   const selectAll = () => {
     setSelectedVendorSlugs(
-      (prev) => new Set([...prev, ...filteredVendors.map((v) => v.slug)])
+      (prev) => new Set([...Array.from(prev), ...filteredVendors.map((v) => v.slug)])
     );
   };
 
   const deselectAll = () => {
     const filteredSlugs = new Set(filteredVendors.map((v) => v.slug));
     setSelectedVendorSlugs(
-      (prev) => new Set([...prev].filter((s) => !filteredSlugs.has(s)))
+      (prev) => new Set(Array.from(prev).filter((s) => !filteredSlugs.has(s)))
     );
   };
 
@@ -109,11 +109,7 @@ export default function AddEventModal({
       const next = new Set(prev);
       if (next.has(slug)) {
         next.delete(slug);
-        const nextBooth = { ...boothMap };
-        Object.keys(nextBooth).forEach((k) => {
-          if (nextBooth[k] === slug) delete nextBooth[k];
-        });
-        setBoothMap(nextBooth);
+        setBoothMap(boothMap.filter((b) => b.boothId !== slug));
       } else {
         next.add(slug);
       }
@@ -181,7 +177,7 @@ export default function AddEventModal({
       obj.set("date", new Date(date));
       if (endDate) obj.set("endDate", new Date(endDate));
       obj.set("hours", hours.trim());
-      obj.set("address", "1717 Bellevue Way NE, Bellevue, WA 98004");
+      obj.set("address", "1105 Northside Blvd, South Bend, IN 46615");
       obj.set("notes", notes.trim());
       obj.set("isPublished", isPublished);
       const boothMapObj: Record<string, BoothPosition> = {};

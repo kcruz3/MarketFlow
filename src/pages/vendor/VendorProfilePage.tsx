@@ -39,7 +39,7 @@ export default function VendorProfilePage() {
       .then(v => {
         if (!v) return;
         const p: VendorProfile = {
-          objectId: v.id,
+          objectId: v.id!,
           name: v.get('name'),
           description: v.get('description') || '',
           location: v.get('location') || '',
