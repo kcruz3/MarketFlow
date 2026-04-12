@@ -91,5 +91,12 @@ export function useReviews(vendorSlug: string) {
     await fetchReviews();
   };
 
-  return { reviews, loading, error, submitReview, refetch: fetchReviews };
+  const deleteReview = async (objectId: string) => {
+    const query = new Parse.Query('Review');
+    const review = await query.get(objectId);
+    await review.destroy();
+    setReviews(prev => prev.filter(r => r.objectId !== objectId));
+  };
+
+  return { reviews, loading, error, submitReview, deleteReview, refetch: fetchReviews };
 }

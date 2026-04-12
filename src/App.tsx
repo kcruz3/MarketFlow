@@ -19,6 +19,7 @@ import AdminVendorsPage from "./pages/admin/VendorsPage";
 import EventsPage from "./pages/admin/EventsPage";
 import AdminApprovalsPage from "./pages/admin/AdminApprovalsPage";
 import AnalyticsDashboard from "./pages/admin/AnalyticsDashboard";
+import AdminReviewsPage from "./pages/admin/ReviewsPage";
 
 import VendorApplyPage from "./pages/vendor/VendorApplyPage";
 import VendorDashboard from "./pages/vendor/VendorDashboard";
@@ -123,6 +124,14 @@ function AppShell() {
             element={
               <ProtectedRoute requiredRole="admin">
                 <AnalyticsDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reviews"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminReviewsPage />
               </ProtectedRoute>
             }
           />

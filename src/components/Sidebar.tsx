@@ -14,6 +14,7 @@ import {
   IconLogOut,
   IconSprout,
   IconShoppingCart,
+  IconStar,
 } from "./Icons";
 
 const consumerLinks = [
@@ -48,6 +49,11 @@ const adminLinks = [
     label: "Analytics",
     icon: <IconChart size={16} />,
     path: "/admin/analytics",
+  },
+  {
+    label: "Reviews",
+    icon: <IconStar size={16} />,
+    path: "/admin/reviews",
   },
 ];
 
