@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import { useVendorOrders, OrderStatus, OrderItem } from "../../hooks/useOrders";
 import { useMenuItems } from "../../hooks/useMenuItems";
+import { useMarketEvents } from "../../hooks/useMarketEvents";
 import {
   IconShoppingCart,
   IconTrash,
@@ -10,6 +11,8 @@ import {
   IconCheck,
   IconZap,
   IconClock,
+  IconCalendar,
+  IconPin,
 } from "../../components/Icons";
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -46,7 +49,8 @@ export default function VendorDashboard() {
     toggleAvailability,
     deleteItem,
   } = useMenuItems(vendorSlug);
-  const [tab, setTab] = useState<"orders" | "menu" | "earnings">("orders");
+  const { events, loading: eLoading } = useMarketEvents();
+  const [tab, setTab] = useState<"orders" | "menu" | "earnings" | "events">("orders");
   const [orderFilter, setOrderFilter] = useState<"active" | "fulfilled">(
     "active"
   );
@@ -119,7 +123,7 @@ export default function VendorDashboard() {
             paddingBottom: 0,
           }}
         >
-          {(["orders", "menu", "earnings"] as const).map((t) => (
+          {(["orders", "menu", "earnings", "events"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -556,6 +560,107 @@ export default function VendorDashboard() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* EVENTS TAB */}
+        {tab === "events" && (
+          <div>
+            <div style={{ marginBottom: 20 }}>
+              <h3 style={{ fontFamily: "Playfair Display, serif", fontSize: 18, color: "var(--green-deep)" }}>
+                Your Market Assignments
+              </h3>
+              <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
+                Events you're scheduled for and your booth number
+              </p>
+            </div>
+
+            {eLoading ? (
+              <div className="loading-spinner">Loading events...</div>
+            ) : (() => {
+              const vendorEvents = events
+                .filter(ev => ev.boothMap.some(b => b.vendorSlug === vendorSlug))
+                .map(ev => ({
+                  event: ev,
+                  booth: ev.boothMap.find(b => b.vendorSlug === vendorSlug)!,
+                }));
+              const now = new Date();
+              const upcoming = vendorEvents.filter(({ event }) => new Date(event.date) >= now);
+              const past = vendorEvents.filter(({ event }) => new Date(event.date) < now);
+
+              if (vendorEvents.length === 0) {
+                return (
+                  <div className="empty-state">
+                    <div style={{ marginBottom: 12 }}>
+                      <IconCalendar size={36} color="var(--text-muted)" />
+                    </div>
+                    <h3>No event assignments yet</h3>
+                    <p>You'll appear here once an admin assigns you to a market event</p>
+                  </div>
+                );
+              }
+
+              const renderEventRow = ({ event, booth }: { event: typeof events[0]; booth: { boothId: string } }) => {
+                const date = new Date(event.date);
+                const isUpcoming = date >= now;
+                return (
+                  <div className="card" key={event.objectId} style={{ marginBottom: 12 }}>
+                    <div className="card-body" style={{ padding: "16px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                            <span style={{ fontFamily: "Playfair Display, serif", fontSize: 16, color: "var(--green-deep)" }}>
+                              {event.name}
+                            </span>
+                            <span className={`badge ${isUpcoming ? "badge-green" : "badge-gray"}`}>
+                              {isUpcoming ? "Upcoming" : "Past"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4 }}>
+                            <IconCalendar size={12} color="var(--text-muted)" style={{ marginRight: 5, verticalAlign: "middle" }} />
+                            {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                            {event.hours && <span style={{ marginLeft: 10, color: "var(--text-muted)" }}>{event.hours}</span>}
+                          </div>
+                          {event.address && (
+                            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                              <IconPin size={12} color="var(--text-muted)" style={{ marginRight: 5, verticalAlign: "middle" }} />
+                              {event.address}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "center", background: "var(--green-pale)", borderRadius: 10, padding: "12px 18px", flexShrink: 0 }}>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 2 }}>Your Booth</div>
+                          <div style={{ fontFamily: "Playfair Display, serif", fontSize: 24, color: "var(--green-deep)", fontWeight: 700 }}>
+                            {booth.boothId}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div>
+                  {upcoming.length > 0 && (
+                    <div style={{ marginBottom: 24 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--text-muted)", marginBottom: 12 }}>
+                        Upcoming ({upcoming.length})
+                      </div>
+                      {upcoming.map(renderEventRow)}
+                    </div>
+                  )}
+                  {past.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "var(--text-muted)", marginBottom: 12 }}>
+                        Past ({past.length})
+                      </div>
+                      {past.map(renderEventRow)}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
