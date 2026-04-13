@@ -32,33 +32,45 @@ export default function VendorProfilePage() {
   const [acceptsPreOrder, setAcceptsPreOrder] = useState(false);
 
   useEffect(() => {
-    if (!user?.vendorSlug) return;
-    const q = new Parse.Query('Vendor');
-    q.equalTo('slug', user.vendorSlug);
-    q.first()
-      .then(v => {
-        if (!v) return;
-        const p: VendorProfile = {
-          objectId: v.id!,
-          name: v.get('name'),
-          description: v.get('description') || '',
-          location: v.get('location') || '',
-          website: v.get('website') || '',
-          tags: v.get('tags') || [],
-          logoUrl: v.get('logoUrl') || '',
-          bannerUrl: v.get('bannerUrl') || '',
-          isOrganic: v.get('isOrganic') || false,
-          acceptsPreOrder: v.get('acceptsPreOrder') || false,
-        };
-        setProfile(p);
-        setDescription(p.description);
-        setLocation(p.location);
-        setWebsite(p.website);
-        setTags(p.tags.join(', '));
-        setAcceptsPreOrder(p.acceptsPreOrder);
-      })
-      .finally(() => setLoading(false));
-  }, [user?.vendorSlug]);
+  if (!user?.vendorSlug) {
+    setLoading(false);
+    return;
+  }
+
+  const q = new Parse.Query('Vendor');
+  q.equalTo('slug', user.vendorSlug);
+  q.first()
+    .then(v => {
+      if (!v) {
+        setProfile(null);
+        return;
+      }
+
+      const p = {
+        objectId: v.id!,
+        name: v.get('name'),
+        description: v.get('description') || '',
+        location: v.get('location') || '',
+        website: v.get('website') || '',
+        tags: v.get('tags') || [],
+        logoUrl: v.get('logoUrl') || '',
+        bannerUrl: v.get('bannerUrl') || '',
+        isOrganic: v.get('isOrganic') || false,
+        acceptsPreOrder: v.get('acceptsPreOrder') || false,
+      };
+
+      setProfile(p);
+      setDescription(p.description);
+      setLocation(p.location);
+      setWebsite(p.website);
+      setTags(p.tags.join(', '));
+      setAcceptsPreOrder(p.acceptsPreOrder);
+    })
+    .catch(err => {
+      setError(err.message || 'Failed to load profile');
+    })
+    .finally(() => setLoading(false));
+}, [user?.vendorSlug]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

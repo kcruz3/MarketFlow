@@ -26,20 +26,21 @@ export async function submitApplication(data: {
   location: string;
   website: string;
 }) {
-  const Obj = Parse.Object.extend('VendorApplication');
-  const obj = new Obj();
-  Object.entries(data).forEach(([k, v]) => obj.set(k, v));
-  obj.set('status', 'pending');
-  obj.set('adminNotes', '');
+  const obj = new Parse.Object('VendorApplication');
 
-  const acl = new Parse.ACL();
-  acl.setReadAccess(data.userId, true);
-  acl.setRoleReadAccess('admin', true);
-  acl.setRoleWriteAccess('admin', true);
-  obj.setACL(acl);
+obj.set('userId', data.userId);
+obj.set('userEmail', data.userEmail);
+obj.set('businessName', data.businessName);
+obj.set('category', data.category);
+obj.set('description', data.description);
 
-  await obj.save();
-  return obj.id;
+if (data.location) obj.set('location', data.location);
+if (data.website) obj.set('website', data.website);
+
+obj.set('status', 'pending');
+obj.set('adminNotes', '');
+
+await obj.save();
 }
 
 export function useVendorApplications() {
@@ -65,35 +66,74 @@ export function useVendorApplications() {
 
   useEffect(() => { fetchApps(); }, [fetchApps]);
 
-  const approve = async (appId: string, userId: string, businessName: string, adminNotes = '') => {
-    // 1. Update application status
-    const appQuery = new Parse.Query('VendorApplication');
-    const app = await appQuery.get(appId);
-    app.set('status', 'approved');
-    app.set('adminNotes', adminNotes);
-    await app.save();
+  const approve = async (
+  appId: string,
+  userId: string,
+  businessName: string,
+  adminNotes = ''
+) => {
+  // 1. Update application status
+  const appQuery = new Parse.Query('VendorApplication');
+  const app = await appQuery.get(appId);
+  app.set('status', 'approved');
+  app.set('adminNotes', adminNotes);
+  await app.save();
 
-    // 2. Add user to vendor role
-    const user = Parse.User.createWithoutData(userId);
-    const roleQuery = new Parse.Query(Parse.Role);
-    roleQuery.equalTo('name', 'vendor');
-    const vendorRole = await roleQuery.first();
-    if (vendorRole) {
-      vendorRole.getUsers().add(user);
-      await vendorRole.save();
-    }
+  // 2. Create slug
+  const slug = businessName
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-');
 
-    // 3. Remove from customer role
-    const custQuery = new Parse.Query(Parse.Role);
-    custQuery.equalTo('name', 'customer');
-    const custRole = await custQuery.first();
-    if (custRole) {
-      custRole.getUsers().remove(user);
-      await custRole.save();
-    }
+  // 3. Create vendor row only if one does not already exist
+  const vendorQuery = new Parse.Query('Vendor');
+  vendorQuery.equalTo('slug', slug);
+  let vendor = await vendorQuery.first();
 
-    await fetchApps();
-  };
+  if (!vendor) {
+    vendor = new Parse.Object('Vendor');
+    vendor.set('name', businessName);
+    vendor.set('slug', slug);
+    vendor.set('ownerId', userId);
+
+    // optional starter fields
+    vendor.set('description', app.get('description') || '');
+    vendor.set('location', app.get('location') || '');
+    vendor.set('website', app.get('website') || '');
+    vendor.set('category', app.get('category') || '');
+    vendor.set('isOrganic', false);
+    vendor.set('acceptsPreOrder', true);
+    vendor.set('tags', []);
+
+    await vendor.save();
+  }
+
+  // 4. Update user with vendorSlug
+  const user = Parse.User.createWithoutData(userId);
+  user.set('vendorSlug', slug);
+  await user.save();
+
+  // 5. Add user to vendor role
+  const roleQuery = new Parse.Query(Parse.Role);
+  roleQuery.equalTo('name', 'vendor');
+  const vendorRole = await roleQuery.first();
+  if (vendorRole) {
+    vendorRole.getUsers().add(user);
+    await vendorRole.save();
+  }
+
+  // 6. Remove user from customer role
+  const custQuery = new Parse.Query(Parse.Role);
+  custQuery.equalTo('name', 'customer');
+  const custRole = await custQuery.first();
+  if (custRole) {
+    custRole.getUsers().remove(user);
+    await custRole.save();
+  }
+
+  await fetchApps();
+};
 
   const reject = async (appId: string, adminNotes = '') => {
     const appQuery = new Parse.Query('VendorApplication');

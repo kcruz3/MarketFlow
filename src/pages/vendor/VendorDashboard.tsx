@@ -37,6 +37,7 @@ const STATUS_ACTIONS: Record<
 export default function VendorDashboard() {
   const { user } = useAuthContext();
   const vendorSlug = user?.vendorSlug ?? "";
+  console.log("vendorSlug:", vendorSlug);
   const {
     orders,
     loading: oLoading,

@@ -24,21 +24,22 @@ async function fetchRole(user: Parse.User): Promise<UserRole> {
   return "customer";
 }
 
-async function fetchVendorSlug(userId: string): Promise<string | undefined> {
+const fetchVendorSlug = async (userId: string) => {
   try {
-    const q = new Parse.Query("VendorApplication");
-    q.equalTo("userId", userId);
-    q.equalTo("status", "approved");
-    const app = await q.first();
-    if (!app) return undefined;
-    const vendorQ = new Parse.Query("Vendor");
-    vendorQ.equalTo("name", app.get("businessName"));
-    const vendor = await vendorQ.first();
-    return vendor?.get("slug");
-  } catch {
-    return undefined;
+    const q = new Parse.Query('Vendor');
+    q.equalTo('ownerId', userId); // or however you link vendor to user
+    const vendor = await q.first();
+
+    if (vendor) {
+      return vendor.get('slug');
+    }
+
+    return null;
+  } catch (err) {
+    console.error("fetchVendorSlug error:", err);
+    return null;
   }
-}
+};
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
