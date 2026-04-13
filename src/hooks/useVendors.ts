@@ -60,8 +60,7 @@ export async function deleteVendorAndUser(vendorId: string, ownerId?: string) {
 
   // 2. Delete user (if exists)
   if (ownerId) {
-    const user = new Parse.User();
-    user.set("objectId", ownerId);
+    const user = Parse.User.createWithoutData(ownerId);
     await user.destroy();
   }
 }

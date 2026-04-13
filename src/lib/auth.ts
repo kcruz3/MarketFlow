@@ -30,18 +30,33 @@ export async function fetchVendorSlugByUserId(
   userId: string
 ): Promise<string | undefined> {
   try {
+    const vendorQuery = new Parse.Query("Vendor");
+    vendorQuery.equalTo("ownerId", userId);
+    vendorQuery.ascending("createdAt");
+    const ownedVendor = await vendorQuery.first();
+
+    if (ownedVendor) {
+      return ownedVendor.get("slug");
+    }
+
     const applicationQuery = new Parse.Query("VendorApplication");
     applicationQuery.equalTo("userId", userId);
     applicationQuery.equalTo("status", "approved");
+    applicationQuery.descending("updatedAt");
     const application = await applicationQuery.first();
 
     if (!application) {
       return undefined;
     }
 
-    const vendorQuery = new Parse.Query("Vendor");
-    vendorQuery.equalTo("name", application.get("businessName"));
-    const vendor = await vendorQuery.first();
+    const approvedBusinessName = application.get("businessName");
+    if (!approvedBusinessName) {
+      return undefined;
+    }
+
+    const approvedVendorQuery = new Parse.Query("Vendor");
+    approvedVendorQuery.equalTo("name", approvedBusinessName);
+    const vendor = await approvedVendorQuery.first();
 
     return vendor?.get("slug");
   } catch {
@@ -51,8 +66,22 @@ export async function fetchVendorSlugByUserId(
 
 export async function buildAuthUser(user: Parse.User): Promise<AuthUser> {
   const role = await fetchUserRole(user);
-  const vendorSlug =
-    role === "vendor" ? await fetchVendorSlugByUserId(user.id!) : undefined;
+  let vendorSlug = user.get("vendorSlug") as string | undefined;
+
+  if (role === "vendor" && !vendorSlug) {
+    vendorSlug = await fetchVendorSlugByUserId(user.id!);
+
+    // Self-heal vendor accounts missing vendorSlug so vendor pages resolve
+    // directly from auth state on later loads.
+    if (vendorSlug) {
+      try {
+        user.set("vendorSlug", vendorSlug);
+        await user.save();
+      } catch {
+        // Ignore user save failures here; the fallback slug still lets the app work.
+      }
+    }
+  }
 
   return {
     objectId: user.id!,

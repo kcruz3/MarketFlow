@@ -3,6 +3,16 @@ import Parse from '../lib/parse';
 
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected';
 
+function createVendorSlug(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 export interface VendorApplication {
   objectId: string;
   userId: string;
@@ -80,16 +90,18 @@ export function useVendorApplications() {
   await app.save();
 
   // 2. Create slug
-  const slug = businessName
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-');
+  const slug = createVendorSlug(businessName);
 
   // 3. Create vendor row only if one does not already exist
   const vendorQuery = new Parse.Query('Vendor');
-  vendorQuery.equalTo('slug', slug);
+  vendorQuery.equalTo('ownerId', userId);
   let vendor = await vendorQuery.first();
+
+  if (!vendor) {
+    const slugQuery = new Parse.Query('Vendor');
+    slugQuery.equalTo('slug', slug);
+    vendor = await slugQuery.first();
+  }
 
   if (!vendor) {
     vendor = new Parse.Object('Vendor');
@@ -107,12 +119,23 @@ export function useVendorApplications() {
     vendor.set('tags', []);
 
     await vendor.save();
+  } else {
+    vendor.set('ownerId', userId);
+    if (!vendor.get('slug')) vendor.set('slug', slug);
+    if (!vendor.get('name')) vendor.set('name', businessName);
+    await vendor.save();
   }
 
   // 4. Update user with vendorSlug
-  const user = Parse.User.createWithoutData(userId);
-  user.set('vendorSlug', slug);
-  await user.save();
+  let user = Parse.User.createWithoutData(userId);
+  try {
+    const userQuery = new Parse.Query(Parse.User);
+    user = await userQuery.get(userId);
+    user.set('vendorSlug', vendor.get('slug') || slug);
+    await user.save();
+  } catch (error) {
+    console.warn('Unable to persist vendorSlug on user during approval', error);
+  }
 
   // 5. Add user to vendor role
   const roleQuery = new Parse.Query(Parse.Role);
