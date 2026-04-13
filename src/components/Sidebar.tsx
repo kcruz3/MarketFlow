@@ -178,7 +178,7 @@ export default function Sidebar() {
         </div>
       )}
 
-      {!user && (
+      {(!user || user.role === "customer") && (
         <div className="sidebar-section">
           <div className="sidebar-section-label">Vendors</div>
           <div className="sidebar-link" onClick={() => goTo("/vendor/apply")}>

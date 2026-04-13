@@ -26,7 +26,7 @@ export default function VendorPage() {
   const navigate = useNavigate();
   const { user } = useAuthContext();
   const { vendor, loading, error } = useVendor(slug || "");
-  const { reviews, loading: rLoading, submitReview } = useReviews(slug || "");
+  const { reviews, loading: rLoading, submitReview, deleteReview } = useReviews(slug || "");
   const { items, loading: mLoading } = useMenuItems(slug || "");
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
@@ -390,7 +390,11 @@ export default function VendorPage() {
                   </div>
                 ) : (
                   reviews.map((review) => (
-                    <ReviewCard key={review.objectId} review={review} />
+                    <ReviewCard
+                      key={review.objectId}
+                      review={review}
+                      onDelete={user?.objectId === review.authorId ? () => deleteReview(review.objectId) : undefined}
+                    />
                   ))
                 )}
                 {!user && (

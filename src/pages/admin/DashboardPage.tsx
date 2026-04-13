@@ -1,12 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
 import { useVendors } from "../../hooks/useVendors";
 import { useMarketEvents } from "../../hooks/useMarketEvents";
 import EventList from "../../components/admin/EventList";
+import AddEventModal from "../../components/admin/AddEventModal";
 import { IconCalendar } from "../../components/Icons";
 
 export default function DashboardPage() {
   const { vendors, loading: vLoading } = useVendors();
-  const { events, loading: eLoading } = useMarketEvents();
+  const { events, loading: eLoading, refetch } = useMarketEvents();
+  const [showAddEvent, setShowAddEvent] = useState(false);
 
   const activeVendors = vendors.filter((v) => v.isActive).length;
   const organicVendors = vendors.filter((v) => v.isOrganic).length;
@@ -62,6 +64,7 @@ export default function DashboardPage() {
               <button
                 className="btn btn-primary"
                 style={{ fontSize: 12, padding: "6px 14px" }}
+                onClick={() => setShowAddEvent(true)}
               >
                 + Add Event
               </button>
@@ -130,6 +133,13 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {showAddEvent && (
+        <AddEventModal
+          onClose={() => setShowAddEvent(false)}
+          onSaved={() => { setShowAddEvent(false); refetch(); }}
+        />
+      )}
     </div>
   );
 }
