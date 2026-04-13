@@ -1,3 +1,5 @@
+/// <reference types="jest" />
+
 import {
   isUpcomingDate,
   parseBoothMap,
@@ -10,26 +12,98 @@ import {
 describe("marketEvents test harness", () => {
   it("parses booth maps from keyed objects and ignores invalid entries", () => {
     const booths = parseBoothMap({
-      "0": { boothId: "A1", x: 10, y: 20, w: 30, h: 40 },
-      "1": { boothId: "A2", x: 50, y: 60, w: 70, h: 80 },
+      "0": {
+        boothId: "A1",
+        vendorSlug: "vendor-a",
+        vendorName: "Vendor A",
+        category: "Farmers, Fishers, Foragers",
+        x: 10,
+        y: 20,
+        w: 30,
+        h: 40,
+      },
+      "1": {
+        boothId: "A2",
+        vendorSlug: "vendor-b",
+        vendorName: "Vendor B",
+        category: "Prepared Food",
+        x: 50,
+        y: 60,
+        w: 70,
+        h: 80,
+      },
       "2": { boothId: "broken", x: "bad", y: 0, w: 0, h: 0 },
     });
 
     expect(booths).toEqual([
-      { boothId: "A1", x: 10, y: 20, w: 30, h: 40 },
-      { boothId: "A2", x: 50, y: 60, w: 70, h: 80 },
+      {
+        boothId: "A1",
+        vendorSlug: "vendor-a",
+        vendorName: "Vendor A",
+        category: "Farmers, Fishers, Foragers",
+        x: 10,
+        y: 20,
+        w: 30,
+        h: 40,
+      },
+      {
+        boothId: "A2",
+        vendorSlug: "vendor-b",
+        vendorName: "Vendor B",
+        category: "Prepared Food",
+        x: 50,
+        y: 60,
+        w: 70,
+        h: 80,
+      },
     ]);
   });
 
   it("serializes booth maps into Parse-friendly keyed objects", () => {
     expect(
       serializeBoothMap([
-        { boothId: "A1", x: 10, y: 20, w: 30, h: 40 },
-        { boothId: "A2", x: 50, y: 60, w: 70, h: 80 },
+        {
+          boothId: "A1",
+          vendorSlug: "vendor-a",
+          vendorName: "Vendor A",
+          category: "Farmers, Fishers, Foragers",
+          x: 10,
+          y: 20,
+          w: 30,
+          h: 40,
+        },
+        {
+          boothId: "A2",
+          vendorSlug: "vendor-b",
+          vendorName: "Vendor B",
+          category: "Prepared Food",
+          x: 50,
+          y: 60,
+          w: 70,
+          h: 80,
+        },
       ])
     ).toEqual({
-      "0": { boothId: "A1", x: 10, y: 20, w: 30, h: 40 },
-      "1": { boothId: "A2", x: 50, y: 60, w: 70, h: 80 },
+      "0": {
+        boothId: "A1",
+        vendorSlug: "vendor-a",
+        vendorName: "Vendor A",
+        category: "Farmers, Fishers, Foragers",
+        x: 10,
+        y: 20,
+        w: 30,
+        h: 40,
+      },
+      "1": {
+        boothId: "A2",
+        vendorSlug: "vendor-b",
+        vendorName: "Vendor B",
+        category: "Prepared Food",
+        x: 50,
+        y: 60,
+        w: 70,
+        h: 80,
+      },
     });
   });
 
