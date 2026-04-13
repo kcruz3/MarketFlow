@@ -53,14 +53,19 @@ export function useVendors(category?: string) {
 }
 
 export async function deleteVendorAndUser(vendorId: string, ownerId?: string) {
-  // 1. Delete vendor
+  // Delete the vendor record first. This is the admin action the UI depends on.
   const vendor = new Parse.Object("Vendor");
   vendor.set("objectId", vendorId);
   await vendor.destroy();
 
-  // 2. Delete user (if exists)
+  // Best-effort cleanup only. Back4App commonly blocks browser clients from
+  // deleting _User rows even when the vendor record can be removed.
   if (ownerId) {
-    const user = Parse.User.createWithoutData(ownerId);
-    await user.destroy();
+    try {
+      const user = Parse.User.createWithoutData(ownerId);
+      await user.destroy();
+    } catch (error: any) {
+      console.warn("Vendor deleted, but linked user could not be deleted", error);
+    }
   }
 }

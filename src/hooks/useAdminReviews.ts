@@ -34,10 +34,19 @@ export function useAdminReviews() {
   useEffect(() => { fetchReviews(); }, []);
 
   const deleteReview = async (objectId: string) => {
-    const query = new Parse.Query('Review');
-    const review = await query.get(objectId);
-    await review.destroy();
-    setReviews(prev => prev.filter(r => r.objectId !== objectId));
+    try {
+      const query = new Parse.Query('Review');
+      const review = await query.get(objectId);
+      await review.destroy();
+      setReviews(prev => prev.filter(r => r.objectId !== objectId));
+    } catch (e: any) {
+      if (e?.code === 119 || /Permission denied/i.test(e?.message || '')) {
+        throw new Error(
+          'This review was created without admin delete access. New reviews are fixed, but existing reviews need their Back4App ACLs updated before admins can remove them.'
+        );
+      }
+      throw e;
+    }
   };
 
   return { reviews, loading, error, deleteReview, refetch: fetchReviews };

@@ -122,7 +122,7 @@ export default function VendorTable({ vendors, onRefresh }: Props) {
                       <button
                         onClick={async () => {
                           const ok = window.confirm(
-                            `Delete ${v.name}? This will also delete the linked user account.`
+                            `Delete ${v.name}? This removes the vendor listing.`
                           );
                           if (!ok) return;
 
@@ -130,7 +130,10 @@ export default function VendorTable({ vendors, onRefresh }: Props) {
                             await deleteVendorAndUser(v.objectId, v.ownerId);
                             onRefresh();
                           } catch (err: any) {
-                            alert(err.message || "Failed to delete vendor");
+                            alert(
+                              err.message ||
+                                "Failed to delete vendor. If this says insufficient auth, the Vendor class delete permissions need to allow admins."
+                            );
                           }
                         }}
                         style={{

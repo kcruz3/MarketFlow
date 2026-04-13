@@ -15,11 +15,15 @@ export default function AdminReviewsPage() {
   const { reviews, loading, error, deleteReview } = useAdminReviews();
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
 
   const handleRemove = async (objectId: string) => {
     setRemovingId(objectId);
+    setActionError("");
     try {
       await deleteReview(objectId);
+    } catch (e: any) {
+      setActionError(e.message || "Failed to remove review");
     } finally {
       setRemovingId(null);
       setConfirmId(null);
@@ -47,6 +51,22 @@ export default function AdminReviewsPage() {
           <h2>Customer Reviews</h2>
           <p>Remove reviews that violate community guidelines</p>
         </div>
+
+        {actionError && (
+          <div
+            style={{
+              background: "#fff0f0",
+              border: "1px solid #ffcdd2",
+              borderRadius: 10,
+              padding: "12px 18px",
+              fontSize: 13.5,
+              color: "#c62828",
+              marginBottom: 20,
+            }}
+          >
+            {actionError}
+          </div>
+        )}
 
         {loading ? (
           <div className="loading-spinner">Loading reviews...</div>

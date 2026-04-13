@@ -72,6 +72,8 @@ export function useReviews(vendorSlug: string) {
     const acl = new Parse.ACL();
     acl.setPublicReadAccess(true);
     acl.setWriteAccess(data.authorId, true);
+    acl.setRoleWriteAccess("admin", true);
+    acl.setRoleWriteAccess("owner", true);
     review.setACL(acl);
 
     await review.save();
