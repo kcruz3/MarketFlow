@@ -42,7 +42,7 @@ export function useAdminReviews() {
     } catch (e: any) {
       if (e?.code === 119 || /Permission denied/i.test(e?.message || '')) {
         throw new Error(
-          'This review was created without admin delete access. New reviews are fixed, but existing reviews need their Back4App ACLs updated before admins can remove them.'
+          'Back4App is denying delete access for the Review class. Even new reviews will fail until the Review class delete permissions allow your admin/owner role, or deletion is moved to a Cloud Function.'
         );
       }
       throw e;
