@@ -35,14 +35,12 @@ export function useAdminReviews() {
 
   const deleteReview = async (objectId: string) => {
     try {
-      const query = new Parse.Query('Review');
-      const review = await query.get(objectId);
-      await review.destroy();
+      await Parse.Cloud.run('deleteReviewAsAdmin', { reviewId: objectId });
       setReviews(prev => prev.filter(r => r.objectId !== objectId));
     } catch (e: any) {
       if (e?.code === 119 || /Permission denied/i.test(e?.message || '')) {
         throw new Error(
-          'Back4App is denying delete access for the Review class. Even new reviews will fail until the Review class delete permissions allow your admin/owner role, or deletion is moved to a Cloud Function.'
+          'Back4App is still denying review deletion. Make sure the deleteReviewAsAdmin Cloud Function has been deployed and that your admin account is in the admin or owner role.'
         );
       }
       throw e;

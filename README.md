@@ -96,3 +96,30 @@ The app uses the following Parse classes:
 - `MenuItem` — vendor menu items
 
 Make sure Public Read access is enabled on `Vendor` and `MarketEvent` for unauthenticated browsing.
+
+## Cloud Code
+
+Admin review deletion now uses a Parse Cloud Function in [cloud/main.js](/Users/kathryncruz/Desktop/MarketFlow/cloud/main.js) named `deleteReviewAsAdmin`.
+
+To deploy it to Back4App:
+
+1. Install the Back4App CLI:
+
+```bash
+npm install -g b4a-cli
+```
+
+2. Log in and link this folder to your Back4App app:
+
+```bash
+b4a configure accountkey
+b4a new
+```
+
+3. Deploy the `cloud/` folder:
+
+```bash
+b4a deploy
+```
+
+Back4App’s docs say `b4a deploy` uploads your `cloud/` and `public/` folders, and Cloud Functions belong in `cloud/main.js`. Sources: [Back4App CLI docs](https://www.back4app.com/docs/platform/command-line-interface), [Back4App migration guide](https://www.back4app.com/parse-migration).
