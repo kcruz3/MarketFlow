@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Parse from "../lib/parse";
-import { UserRole } from "./useAuth";
+import { USER_ROLES, fetchUserRoleAssignments } from "../lib/auth";
+import type { UserRole } from "../lib/auth";
 
 export interface ManagedUser {
   objectId: string;
@@ -8,21 +9,6 @@ export interface ManagedUser {
   username: string;
   role: UserRole;
   createdAt: Date;
-}
-
-const ROLES: UserRole[] = ["owner", "admin", "vendor", "customer"];
-
-async function getUserRole(userId: string): Promise<UserRole> {
-  for (const roleName of ROLES) {
-    const userQuery = new Parse.Query(Parse.User);
-    const user = await userQuery.get(userId, { useMasterKey: false });
-    const q = new Parse.Query(Parse.Role);
-    q.equalTo("name", roleName);
-    q.equalTo("users", user);
-    const match = await q.first();
-    if (match) return roleName;
-  }
-  return "customer";
 }
 
 export function useUsers() {
@@ -41,31 +27,15 @@ export function useUsers() {
         username: string;
         createdAt: string;
       }>;
+      const roleAssignments = await fetchUserRoleAssignments();
 
-      // Fetch role for each user client-side via Role queries
-      const withRoles = await Promise.all(
-        rawUsers.map(async (u) => {
-          let role: UserRole = "customer";
-          for (const roleName of ROLES) {
-            const userPtr = Parse.User.createWithoutData(u.objectId);
-            const q = new Parse.Query(Parse.Role);
-            q.equalTo("name", roleName);
-            q.equalTo("users", userPtr);
-            const match = await q.first();
-            if (match) {
-              role = roleName;
-              break;
-            }
-          }
-          return {
-            objectId: u.objectId,
-            email: u.email,
-            username: u.username,
-            role,
-            createdAt: new Date(u.createdAt),
-          };
-        })
-      );
+      const withRoles = rawUsers.map((user) => ({
+        objectId: user.objectId,
+        email: user.email,
+        username: user.username,
+        role: roleAssignments.get(user.objectId) ?? "customer",
+        createdAt: new Date(user.createdAt),
+      }));
 
       setUsers(withRoles);
     } catch (e: any) {
@@ -83,7 +53,7 @@ export function useUsers() {
     const userPtr = Parse.User.createWithoutData(userId);
 
     // Remove from all roles
-    for (const roleName of ROLES) {
+    for (const roleName of USER_ROLES) {
       const roleQuery = new Parse.Query(Parse.Role);
       roleQuery.equalTo("name", roleName);
       const role = await roleQuery.first();

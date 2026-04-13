@@ -4,6 +4,11 @@ import { useVendors } from "../../hooks/useVendors";
 import { useMarketEvents } from "../../hooks/useMarketEvents";
 import VendorCard from "../../components/consumer/VendorCard";
 import MarketMap, { BoothPosition } from "../../components/consumer/MarketMap";
+import {
+  isUpcomingDate,
+  parseBoothMap,
+  sortEventsByDateAsc,
+} from "../../lib/marketEvents";
 
 const CATEGORIES = [
   "All",
@@ -19,18 +24,15 @@ export default function MapPage() {
   const [search, setSearch] = useState("");
   const [mapTab, setMapTab] = useState<"map" | "list">("map");
 
-  const publishedEvents = events
-    .filter((e) => e.isPublished && new Date(e.date) >= new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const publishedEvents = sortEventsByDateAsc(
+    events.filter((event) => event.isPublished && isUpcomingDate(event.date))
+  );
 
   const nextEvent = publishedEvents[0] ?? null;
 
   // Build BoothPosition[] from the event's boothMap
-  const booths: BoothPosition[] = nextEvent?.boothMap
-    ? Object.values(nextEvent.boothMap as Record<string, any>).filter(
-        (b): b is BoothPosition =>
-          b && typeof b === "object" && "vendorSlug" in b && "x" in b
-      )
+  const booths: BoothPosition[] = nextEvent
+    ? parseBoothMap(nextEvent.boothMap)
     : [];
 
   const filtered = vendors.filter((v) => {

@@ -1,45 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Parse from "../lib/parse";
-
-export type UserRole = "owner" | "admin" | "vendor" | "customer";
-
-export interface AuthUser {
-  objectId: string;
-  email: string;
-  username: string;
-  role: UserRole;
-  vendorSlug?: string;
-}
-
-const ROLES: UserRole[] = ["owner", "admin", "vendor", "customer"];
-
-async function fetchRole(user: Parse.User): Promise<UserRole> {
-  for (const roleName of ROLES) {
-    const q = new Parse.Query(Parse.Role);
-    q.equalTo("name", roleName);
-    q.equalTo("users", user);
-    const match = await q.first();
-    if (match) return roleName;
-  }
-  return "customer";
-}
-
-const fetchVendorSlug = async (userId: string) => {
-  try {
-    const q = new Parse.Query('Vendor');
-    q.equalTo('ownerId', userId); // or however you link vendor to user
-    const vendor = await q.first();
-
-    if (vendor) {
-      return vendor.get('slug');
-    }
-
-    return null;
-  } catch (err) {
-    console.error("fetchVendorSlug error:", err);
-    return null;
-  }
-};
+import { buildAuthUser } from "../lib/auth";
+export type { AuthUser, UserRole } from "../lib/auth";
+import type { AuthUser, UserRole } from "../lib/auth";
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -53,16 +16,7 @@ export function useAuth() {
       return;
     }
     try {
-      const role = await fetchRole(current);
-      const vendorSlug =
-        role === "vendor" ? await fetchVendorSlug(current.id!) : undefined;
-      setUser({
-        objectId: current.id!,
-        email: current.get("email"),
-        username: current.get("username"),
-        role,
-        vendorSlug,
-      });
+      setUser(await buildAuthUser(current));
     } catch {
       setUser(null);
     } finally {
@@ -76,17 +30,9 @@ export function useAuth() {
 
   const login = async (email: string, password: string) => {
     const loggedIn = await Parse.User.logIn(email, password);
-    const role = await fetchRole(loggedIn);
-    const vendorSlug =
-      role === "vendor" ? await fetchVendorSlug(loggedIn.id!) : undefined;
-    setUser({
-      objectId: loggedIn.id!,
-      email: loggedIn.get("email"),
-      username: loggedIn.get("username"),
-      role,
-      vendorSlug,
-    });
-    return role;
+    const authUser = await buildAuthUser(loggedIn);
+    setUser(authUser);
+    return authUser.role;
   };
 
   const signup = async (email: string, password: string) => {

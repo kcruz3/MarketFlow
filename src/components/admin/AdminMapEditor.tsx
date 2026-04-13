@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { parseBoothMap } from "../../hooks/useMarketEvents";
+import { parseBoothMap } from "../../lib/marketEvents";
 import { Vendor } from "../../hooks/useVendors";
 import { BoothPosition } from "../consumer/MarketMap";
 

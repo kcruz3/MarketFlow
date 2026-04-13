@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Parse from "../lib/parse";
 import { BoothPosition } from "../components/consumer/MarketMap";
+import { parseBoothMap } from "../lib/marketEvents";
 
 export interface MarketEvent {
   objectId: string;
@@ -12,30 +13,6 @@ export interface MarketEvent {
   boothMap: BoothPosition[];
   isPublished: boolean;
   notes: string;
-}
-
-export function parseBoothMap(raw: any): BoothPosition[] {
-  if (!raw) return [];
-
-  let items: any[] = [];
-
-  if (Array.isArray(raw)) {
-    items = raw;
-  } else if (typeof raw === "object") {
-    // Parse sometimes returns arrays as {"0":{...},"1":{...}}
-    items = Object.values(raw);
-  }
-
-  return items.filter(
-    (b): b is BoothPosition =>
-      b !== null &&
-      typeof b === "object" &&
-      typeof b.x === "number" &&
-      typeof b.y === "number" &&
-      typeof b.w === "number" &&
-      typeof b.h === "number" &&
-      typeof b.boothId === "string"
-  );
 }
 
 export function useMarketEvents() {

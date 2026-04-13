@@ -2,14 +2,14 @@ import React, { useState } from "react";
 import { useMarketEvents, MarketEvent } from "../../hooks/useMarketEvents";
 import EventList from "../../components/admin/EventList";
 import AddEventModal from "../../components/admin/AddEventModal";
+import { splitEventsByDate } from "../../lib/marketEvents";
 
 export default function EventsPage() {
   const { events, loading, error, refetch } = useMarketEvents();
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<MarketEvent | null>(null);
 
-  const upcoming = events.filter((e) => new Date(e.date) >= new Date());
-  const past = events.filter((e) => new Date(e.date) < new Date());
+  const { upcoming, past } = splitEventsByDate(events);
 
   const handleEdit = (event: MarketEvent) => {
     setEditingEvent(event);

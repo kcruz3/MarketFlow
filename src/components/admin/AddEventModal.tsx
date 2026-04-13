@@ -4,7 +4,11 @@ import { MarketEvent } from "../../hooks/useMarketEvents";
 import Parse from "../../lib/parse";
 import AdminMapEditor from "./AdminMapEditor";
 import { BoothPosition } from "../consumer/MarketMap";
-import { parseBoothMap } from "../../hooks/useMarketEvents";
+import {
+  parseBoothMap,
+  serializeBoothMap,
+  toDateInputValue,
+} from "../../lib/marketEvents";
 
 interface Props {
   onClose: () => void;
@@ -13,12 +17,6 @@ interface Props {
 }
 
 type Step = "details" | "vendors" | "booths";
-
-function toDateInput(d: any): string {
-  if (!d) return "";
-  const date = d instanceof Date ? d : new Date(d);
-  return date.toISOString().split("T")[0];
-}
 
 export default function AddEventModal({
   onClose,
@@ -33,8 +31,8 @@ export default function AddEventModal({
 
   // Form state — pre-fill if editing
   const [name, setName] = useState(editEvent?.name ?? "");
-  const [date, setDate] = useState(toDateInput(editEvent?.date));
-  const [endDate, setEndDate] = useState(toDateInput(editEvent?.endDate));
+  const [date, setDate] = useState(toDateInputValue(editEvent?.date));
+  const [endDate, setEndDate] = useState(toDateInputValue(editEvent?.endDate));
   const [hours, setHours] = useState(editEvent?.hours ?? "10:00 AM – 3:00 PM");
   const [notes, setNotes] = useState(editEvent?.notes ?? "");
   const [isPublished, setIsPublished] = useState(
@@ -145,12 +143,7 @@ export default function AddEventModal({
     try {
       const q = new Parse.Query("MarketEvent");
       const obj = await q.get(editEvent.objectId);
-      // Store as keyed object so Parse preserves structure on read
-      const mapObj: Record<string, BoothPosition> = {};
-      boothMap.forEach((b, i) => {
-        mapObj[String(i)] = b;
-      });
-      obj.set("boothMap", mapObj);
+      obj.set("boothMap", serializeBoothMap(boothMap));
       await obj.save();
       onSaved();
     } catch (e: any) {
@@ -180,11 +173,7 @@ export default function AddEventModal({
       obj.set("address", "1105 Northside Blvd, South Bend, IN 46615");
       obj.set("notes", notes.trim());
       obj.set("isPublished", isPublished);
-      const boothMapObj: Record<string, BoothPosition> = {};
-      boothMap.forEach((b, i) => {
-        boothMapObj[String(i)] = b;
-      });
-      obj.set("boothMap", boothMapObj);
+      obj.set("boothMap", serializeBoothMap(boothMap));
       await obj.save();
 
       // Rebuild vendor relation from scratch
