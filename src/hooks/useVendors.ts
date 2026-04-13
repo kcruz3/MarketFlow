@@ -19,6 +19,7 @@ export interface Vendor {
   reviewCount: number;
   acceptsPreOrder: boolean;
   isActive: boolean;
+  ownerId?: string;
 }
 
 export function useVendors(category?: string) {
@@ -49,4 +50,18 @@ export function useVendors(category?: string) {
   }, [fetchVendors]);
 
   return { vendors, loading, error, refetch: fetchVendors };
+}
+
+export async function deleteVendorAndUser(vendorId: string, ownerId?: string) {
+  // 1. Delete vendor
+  const vendor = new Parse.Object("Vendor");
+  vendor.set("objectId", vendorId);
+  await vendor.destroy();
+
+  // 2. Delete user (if exists)
+  if (ownerId) {
+    const user = new Parse.User();
+    user.set("objectId", ownerId);
+    await user.destroy();
+  }
 }

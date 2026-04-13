@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Vendor } from "../../hooks/useVendors";
+import { Vendor, deleteVendorAndUser } from "../../hooks/useVendors";
 import VendorEditModal from "./VendorEditModal";
 import { IconEdit } from "../Icons";
 
@@ -97,26 +97,57 @@ export default function VendorTable({ vendors, onRefresh }: Props) {
                     </span>
                   </td>
                   <td>
-                    <button
-                      onClick={() => setEditing(v)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 5,
-                        padding: "5px 11px",
-                        borderRadius: 7,
-                        border: "1px solid var(--cream-dark)",
-                        background: "var(--white)",
-                        cursor: "pointer",
-                        fontSize: 12.5,
-                        color: "var(--text-secondary)",
-                        fontFamily: "Nunito, sans-serif",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <IconEdit size={13} />
-                      Edit
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button
+                        onClick={() => setEditing(v)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "5px 11px",
+                          borderRadius: 7,
+                          border: "1px solid var(--cream-dark)",
+                          background: "var(--white)",
+                          cursor: "pointer",
+                          fontSize: 12.5,
+                          color: "var(--text-secondary)",
+                          fontFamily: "Nunito, sans-serif",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <IconEdit size={13} />
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          const ok = window.confirm(
+                            `Delete ${v.name}? This will also delete the linked user account.`
+                          );
+                          if (!ok) return;
+
+                          try {
+                            await deleteVendorAndUser(v.objectId, v.ownerId);
+                            onRefresh();
+                          } catch (err: any) {
+                            alert(err.message || "Failed to delete vendor");
+                          }
+                        }}
+                        style={{
+                          padding: "5px 11px",
+                          borderRadius: 7,
+                          border: "1px solid #e0b4b4",
+                          background: "#fff5f5",
+                          cursor: "pointer",
+                          fontSize: 12.5,
+                          color: "#b42318",
+                          fontFamily: "Nunito, sans-serif",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
