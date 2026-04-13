@@ -16,13 +16,14 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AdminApprovalsPage() {
-  const { applications, loading, approve, reject } = useVendorApplications();
+  const { applications, loading, error, approve, reject } = useVendorApplications();
   const [filter, setFilter] = useState<
     "all" | "pending" | "approved" | "rejected"
   >("pending");
   const [actionId, setActionId] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   const filtered = applications.filter(
     (a) => filter === "all" || a.status === filter
@@ -30,10 +31,13 @@ export default function AdminApprovalsPage() {
 
   const handleApprove = async (app: VendorApplication) => {
     setProcessing(true);
+    setActionError("");
     try {
       await approve(app.objectId, app.userId, app.businessName, notes);
       setActionId(null);
       setNotes("");
+    } catch (e: any) {
+      setActionError(e.message || "Failed to approve application");
     } finally {
       setProcessing(false);
     }
@@ -41,10 +45,13 @@ export default function AdminApprovalsPage() {
 
   const handleReject = async (appId: string) => {
     setProcessing(true);
+    setActionError("");
     try {
       await reject(appId, notes);
       setActionId(null);
       setNotes("");
+    } catch (e: any) {
+      setActionError(e.message || "Failed to reject application");
     } finally {
       setProcessing(false);
     }
@@ -70,6 +77,29 @@ export default function AdminApprovalsPage() {
           <h2>Vendor Applications</h2>
           <p>Review and approve vendors applying to join the market</p>
         </div>
+
+        {error && (
+          <div className="empty-state" style={{ marginBottom: 20 }}>
+            <h3>Could not load applications</h3>
+            <p>{error}</p>
+          </div>
+        )}
+
+        {actionError && (
+          <div
+            style={{
+              background: "#fff0f0",
+              border: "1px solid #ffcdd2",
+              borderRadius: 10,
+              padding: "12px 18px",
+              fontSize: 13.5,
+              color: "#c62828",
+              marginBottom: 20,
+            }}
+          >
+            {actionError}
+          </div>
+        )}
 
         {/* Filter tabs */}
         <div className="filter-bar" style={{ marginBottom: 20 }}>

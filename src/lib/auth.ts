@@ -65,10 +65,10 @@ export async function fetchVendorSlugByUserId(
 }
 
 export async function buildAuthUser(user: Parse.User): Promise<AuthUser> {
-  const role = await fetchUserRole(user);
+  const baseRole = await fetchUserRole(user);
   let vendorSlug = user.get("vendorSlug") as string | undefined;
 
-  if (role === "vendor" && !vendorSlug) {
+  if (baseRole !== "owner" && baseRole !== "admin" && !vendorSlug) {
     vendorSlug = await fetchVendorSlugByUserId(user.id!);
 
     // Self-heal vendor accounts missing vendorSlug so vendor pages resolve
@@ -82,6 +82,11 @@ export async function buildAuthUser(user: Parse.User): Promise<AuthUser> {
       }
     }
   }
+
+  const role =
+    (baseRole === "customer" || baseRole === "vendor") && vendorSlug
+      ? "vendor"
+      : baseRole;
 
   return {
     objectId: user.id!,

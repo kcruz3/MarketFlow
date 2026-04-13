@@ -56,9 +56,11 @@ await obj.save();
 export function useVendorApplications() {
   const [applications, setApplications] = useState<VendorApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchApps = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const query = new Parse.Query('VendorApplication');
       query.descending('createdAt');
@@ -69,6 +71,8 @@ export function useVendorApplications() {
         ...r.attributes,
         createdAt: r.createdAt,
       } as VendorApplication)));
+    } catch (e: any) {
+      setError(e.message || 'Failed to load applications');
     } finally {
       setLoading(false);
     }
@@ -137,22 +141,30 @@ export function useVendorApplications() {
     console.warn('Unable to persist vendorSlug on user during approval', error);
   }
 
-  // 5. Add user to vendor role
-  const roleQuery = new Parse.Query(Parse.Role);
-  roleQuery.equalTo('name', 'vendor');
-  const vendorRole = await roleQuery.first();
-  if (vendorRole) {
-    vendorRole.getUsers().add(user);
-    await vendorRole.save();
+  // 5. Best-effort role maintenance. Back4App often blocks Role writes from
+  // browser clients, so approval should still succeed without these updates.
+  try {
+    const roleQuery = new Parse.Query(Parse.Role);
+    roleQuery.equalTo('name', 'vendor');
+    const vendorRole = await roleQuery.first();
+    if (vendorRole) {
+      vendorRole.getUsers().add(user);
+      await vendorRole.save();
+    }
+  } catch (error) {
+    console.warn('Unable to add approved user to vendor role', error);
   }
 
-  // 6. Remove user from customer role
-  const custQuery = new Parse.Query(Parse.Role);
-  custQuery.equalTo('name', 'customer');
-  const custRole = await custQuery.first();
-  if (custRole) {
-    custRole.getUsers().remove(user);
-    await custRole.save();
+  try {
+    const custQuery = new Parse.Query(Parse.Role);
+    custQuery.equalTo('name', 'customer');
+    const custRole = await custQuery.first();
+    if (custRole) {
+      custRole.getUsers().remove(user);
+      await custRole.save();
+    }
+  } catch (error) {
+    console.warn('Unable to remove approved user from customer role', error);
   }
 
   await fetchApps();
@@ -167,5 +179,5 @@ export function useVendorApplications() {
     await fetchApps();
   };
 
-  return { applications, loading, approve, reject, refetch: fetchApps };
+  return { applications, loading, error, approve, reject, refetch: fetchApps };
 }
