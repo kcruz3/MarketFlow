@@ -74,12 +74,11 @@ export function useVendorApplications() {
     await app.save();
 
     // 2. Add user to vendor role
+    const user = Parse.User.createWithoutData(userId);
     const roleQuery = new Parse.Query(Parse.Role);
     roleQuery.equalTo('name', 'vendor');
     const vendorRole = await roleQuery.first();
     if (vendorRole) {
-      const userQuery = new Parse.Query(Parse.User);
-      const user = await userQuery.get(userId);
       vendorRole.getUsers().add(user);
       await vendorRole.save();
     }
@@ -89,8 +88,6 @@ export function useVendorApplications() {
     custQuery.equalTo('name', 'customer');
     const custRole = await custQuery.first();
     if (custRole) {
-      const userQuery = new Parse.Query(Parse.User);
-      const user = await userQuery.get(userId);
       custRole.getUsers().remove(user);
       await custRole.save();
     }
