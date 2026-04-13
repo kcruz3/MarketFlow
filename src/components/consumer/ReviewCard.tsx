@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Review } from '../../hooks/useReviews';
 
 interface Props {
   review: Review;
+  onDelete?: () => Promise<void>;
 }
 
 function Stars({ rating }: { rating: number }) {
@@ -14,7 +15,10 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-export default function ReviewCard({ review }: Props) {
+export default function ReviewCard({ review, onDelete }: Props) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const date = new Date(review.createdAt).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
@@ -23,6 +27,17 @@ export default function ReviewCard({ review }: Props) {
     .split('@')[0]
     .slice(0, 2)
     .toUpperCase();
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete();
+    } finally {
+      setDeleting(false);
+      setConfirming(false);
+    }
+  };
 
   return (
     <div style={s.card}>
@@ -35,6 +50,32 @@ export default function ReviewCard({ review }: Props) {
             <span style={s.date}>{date}</span>
           </div>
         </div>
+        {onDelete && (
+          confirming ? (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: 'none', background: '#fee2e2', color: '#b91c1c', cursor: 'pointer' }}
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--cream-dark)', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirming(true)}
+              style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid var(--cream-dark)', background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+            >
+              Remove
+            </button>
+          )
+        )}
       </div>
 
       <p style={s.body}>{review.body}</p>
