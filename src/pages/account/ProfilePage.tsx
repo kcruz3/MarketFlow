@@ -55,9 +55,99 @@ export default function ProfilePage() {
       </div>
 
       <div className="page-content">
-        <div className="page-header">
-          <h2>Your Profile</h2>
-          <p>Update the name and contact details other people see in the app</p>
+        <div
+          style={{
+            marginBottom: 28,
+            borderRadius: 28,
+            padding: "32px 34px",
+            background:
+              "linear-gradient(135deg, rgba(255,255,255,0.92), rgba(237,245,239,0.95))",
+            border: "1px solid rgba(179, 208, 188, 0.85)",
+            boxShadow: "var(--shadow-md)",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 24,
+            alignItems: "end",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "1.4px",
+                color: "var(--text-muted)",
+                fontWeight: 700,
+                marginBottom: 12,
+              }}
+            >
+              Account settings
+            </div>
+            <h2
+              style={{
+                fontSize: 40,
+                lineHeight: 1.02,
+                color: "var(--forest)",
+                marginBottom: 10,
+              }}
+            >
+              {displayName || user?.displayName || user?.username || "Your profile"}
+            </h2>
+            <p
+              style={{
+                fontSize: 15,
+                color: "var(--text-secondary)",
+                lineHeight: 1.6,
+                maxWidth: 560,
+              }}
+            >
+              Keep your public-facing details up to date so orders, reviews, and
+              vendor conversations feel more personal and trustworthy.
+            </p>
+          </div>
+
+          <div
+            style={{
+              justifySelf: "end",
+              width: "100%",
+              maxWidth: 220,
+              padding: "18px 20px",
+              borderRadius: 22,
+              background: "rgba(23, 53, 40, 0.95)",
+              color: "white",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "1.2px",
+                color: "rgba(255,255,255,0.55)",
+                marginBottom: 8,
+              }}
+            >
+              Current role
+            </div>
+            <div
+              style={{
+                fontFamily: "Playfair Display, serif",
+                fontSize: 28,
+                marginBottom: 4,
+                textTransform: "capitalize",
+              }}
+            >
+              {user?.role}
+            </div>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: "rgba(255,255,255,0.7)",
+                lineHeight: 1.5,
+              }}
+            >
+              Your sign-in email stays the same, but your display details can change anytime.
+            </div>
+          </div>
         </div>
 
         {saved && (
@@ -94,7 +184,14 @@ export default function ProfilePage() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 320px", gap: 24, alignItems: "start" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 24,
+              alignItems: "start",
+            }}
+          >
             <div className="card">
               <div className="card-header">
                 <h3>Personal details</h3>
@@ -108,6 +205,9 @@ export default function ProfilePage() {
                     placeholder="How your name should appear"
                     style={inputStyle}
                   />
+                  <span style={hintStyle}>
+                    This is the name people will see on reviews and account screens.
+                  </span>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -155,10 +255,12 @@ export default function ProfilePage() {
                   <div style={summaryLabelStyle}>Username</div>
                   <div style={summaryValueStyle}>{user?.username}</div>
                 </div>
-                <div>
-                  <div style={summaryLabelStyle}>Vendor link</div>
-                  <div style={summaryValueStyle}>{user?.vendorSlug || "Not linked"}</div>
-                </div>
+                {user?.role === "vendor" && (
+                  <div>
+                    <div style={summaryLabelStyle}>Vendor link</div>
+                    <div style={summaryValueStyle}>{user?.vendorSlug || "Not linked"}</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -186,14 +288,15 @@ const hintStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 8,
-  border: "1px solid var(--cream-dark)",
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(221, 207, 187, 0.95)",
   fontSize: 14,
   outline: "none",
   fontFamily: "DM Sans, sans-serif",
-  background: "var(--cream)",
+  background: "rgba(248, 244, 236, 0.82)",
   color: "var(--text-primary)",
+  boxShadow: "var(--shadow-sm)",
 };
 
 const summaryLabelStyle: React.CSSProperties = {
