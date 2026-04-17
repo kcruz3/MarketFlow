@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { IconLeaf, IconJar, IconUtensilsCrossed, IconMap } from "../Icons";
 
 export interface BoothPosition {
   vendorSlug: string;
   vendorId?: string;
   vendorName: string;
+  averageRating?: number | null;
+  reviewCount?: number | null;
   category: string;
   x: number;
   y: number;
@@ -51,7 +52,6 @@ export default function MarketMap({
   width = 800,
   height = 520,
 }: Props) {
-  const navigate = useNavigate();
   const [selected, setSelected] = useState<BoothPosition | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -217,7 +217,7 @@ export default function MarketMap({
           )}
 
           {/* Booth cells */}
-          {booths.map((booth) => {
+          {booths.map((booth, index) => {
             const isSelected = selected?.boothId === booth.boothId;
             const isHovered = hovered === booth.boothId;
             const col = getCategoryColor(booth.category);
@@ -244,7 +244,7 @@ export default function MarketMap({
 
             return (
               <g
-                key={booth.boothId}
+                key={`${booth.boothId}-${index}`}
                 style={{ cursor: "pointer" }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -343,15 +343,17 @@ export default function MarketMap({
         {/* Vendor popover panel */}
         {selected && (
           (() => {
-            const linkCandidate =
-              (typeof selected.vendorSlug === "string"
-                ? selected.vendorSlug.trim()
-                : "") ||
-              (typeof selected.vendorId === "string"
-                ? selected.vendorId.trim()
-                : "");
-            const hasVendorLink =
-              linkCandidate.length > 0;
+            const ratingValue =
+              typeof selected.averageRating === "number" &&
+              Number.isFinite(selected.averageRating)
+                ? selected.averageRating
+                : null;
+            const reviewCount =
+              typeof selected.reviewCount === "number" &&
+              Number.isFinite(selected.reviewCount)
+                ? selected.reviewCount
+                : 0;
+            const hasRatings = ratingValue !== null;
 
             return (
           <div
@@ -398,7 +400,7 @@ export default function MarketMap({
               style={{
                 fontSize: 11,
                 color: "var(--text-muted)",
-                marginBottom: 12,
+                marginBottom: 10,
               }}
             >
               {selected.category === "Farmers, Fishers, Foragers"
@@ -407,27 +409,43 @@ export default function MarketMap({
                 ? "Producer"
                 : "Prepared Food"}
             </div>
-            <button
-              onClick={() =>
-                hasVendorLink &&
-                navigate(`/vendors/${encodeURIComponent(linkCandidate)}`)
-              }
+            <div
               style={{
                 width: "100%",
-                padding: "8px",
+                padding: "9px 10px",
                 borderRadius: 8,
-                border: "none",
-                background: hasVendorLink ? "var(--green-mid)" : "var(--cream-dark)",
-                color: hasVendorLink ? "white" : "var(--text-muted)",
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: hasVendorLink ? "pointer" : "not-allowed",
+                border: "1px solid var(--cream-dark)",
+                background: "var(--cream)",
+                color: "var(--text-secondary)",
+                fontSize: 12.5,
                 fontFamily: "DM Sans, sans-serif",
               }}
-              disabled={!hasVendorLink}
             >
-              {hasVendorLink ? "View vendor →" : "No vendor assigned"}
-            </button>
+              <div
+                style={{
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.7px",
+                  color: "var(--text-muted)",
+                  marginBottom: 3,
+                }}
+              >
+                Average rating
+              </div>
+              <div
+                style={{
+                  fontWeight: 600,
+                  color: "var(--forest)",
+                  fontSize: 13.5,
+                }}
+              >
+                {hasRatings
+                  ? reviewCount > 0
+                    ? `${ratingValue.toFixed(1)} / 5 (${reviewCount})`
+                    : `${ratingValue.toFixed(1)} / 5`
+                  : "No ratings yet"}
+              </div>
+            </div>
           </div>
             );
           })()

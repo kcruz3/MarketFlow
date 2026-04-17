@@ -1,7 +1,9 @@
 import { IconMap } from "../../components/Icons";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useVendors } from "../../hooks/useVendors";
 import { useMarketEvents } from "../../hooks/useMarketEvents";
 import MarketMap, { BoothPosition } from "../../components/consumer/MarketMap";
+import Parse from "../../lib/parse";
 import {
   isUpcomingDate,
   splitEventsByDate,
@@ -19,25 +21,34 @@ function normalizeVendorKey(value: string) {
 }
 
 export default function MapPage() {
+  const { vendors } = useVendors();
   const { events, loading: eLoading } = useMarketEvents();
   const vendorsFromEvents = events.flatMap((event) => event.boothMap ?? []);
+  const vendorBySlug = new Map(vendors.map((vendor) => [vendor.slug, vendor]));
+  const vendorById = new Map(vendors.map((vendor) => [vendor.objectId, vendor]));
+  const vendorByNormalizedName = new Map(
+    vendors.map((vendor) => [normalizeVendorKey(vendor.name), vendor])
+  );
   const vendorSlugToSlug = new Map(
-    vendorsFromEvents
-      .filter((booth) => booth.vendorSlug)
-      .map((booth) => [booth.vendorSlug, booth.vendorSlug])
+    vendors.map((vendor) => [vendor.slug, vendor.slug])
   );
   const vendorsById = new Map(
-    vendorsFromEvents
-      .filter((booth) => booth.vendorId && booth.vendorSlug)
-      .map((booth) => [booth.vendorId!, booth.vendorSlug])
+    vendors.map((vendor) => [vendor.objectId, vendor.slug])
   );
   const vendorsByNormalizedName = new Map(
+    vendors.map((vendor) => [normalizeVendorKey(vendor.name), vendor.slug])
+  );
+  // Fallback maps when Vendor query has not loaded yet.
+  const fallbackSlugByName = new Map(
     vendorsFromEvents
       .filter((booth) => booth.vendorName && booth.vendorSlug)
       .map((booth) => [normalizeVendorKey(booth.vendorName), booth.vendorSlug])
   );
   const [mapTab, setMapTab] = useState<"map" | "events">("map");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [ratingsBySlug, setRatingsBySlug] = useState<
+    Map<string, { average: number; count: number }>
+  >(new Map());
 
   const publishedEvents = sortEventsByDateAsc(
     events.filter((event) => event.isPublished && isUpcomingDate(event.date))
@@ -55,20 +66,102 @@ export default function MapPage() {
     publishedEvents.find((event) => event.objectId === selectedEventId) ??
     nextEvent;
 
+  const resolveVendorForBooth = (booth: BoothPosition) => {
+    const currentSlug = (booth.vendorSlug || "").trim();
+    const currentId = (booth.vendorId || "").trim();
+    const normalizedName = normalizeVendorKey(booth.vendorName || "");
+
+    return (
+      (currentSlug ? vendorBySlug.get(currentSlug) : undefined) ||
+      (currentId ? vendorById.get(currentId) : undefined) ||
+      (normalizedName ? vendorByNormalizedName.get(normalizedName) : undefined) ||
+      (currentSlug ? vendorByNormalizedName.get(normalizeVendorKey(currentSlug)) : undefined)
+    );
+  };
+
+  useEffect(() => {
+    const vendorSlugs = Array.from(
+      new Set(
+        (selectedEvent?.boothMap ?? [])
+          .map((booth) => resolveVendorForBooth(booth)?.slug || (booth.vendorSlug || "").trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (vendorSlugs.length === 0) {
+      setRatingsBySlug(new Map());
+      return;
+    }
+
+    let cancelled = false;
+    const loadRatings = async () => {
+      try {
+        const query = new Parse.Query("Review");
+        query.containedIn("vendorSlug", vendorSlugs);
+        query.limit(1000);
+        const reviews = await query.find();
+
+        const accumulator = new Map<string, { sum: number; count: number }>();
+        reviews.forEach((review) => {
+          const slug = String(review.get("vendorSlug") || "").trim();
+          const rating = Number(review.get("rating") || 0);
+          if (!slug || !Number.isFinite(rating) || rating <= 0) return;
+
+          const existing = accumulator.get(slug) || { sum: 0, count: 0 };
+          existing.sum += rating;
+          existing.count += 1;
+          accumulator.set(slug, existing);
+        });
+
+        const normalized = new Map<string, { average: number; count: number }>();
+        accumulator.forEach((value, slug) => {
+          normalized.set(slug, {
+            average: value.sum / value.count,
+            count: value.count,
+          });
+        });
+
+        if (!cancelled) setRatingsBySlug(normalized);
+      } catch {
+        if (!cancelled) setRatingsBySlug(new Map());
+      }
+    };
+
+    loadRatings();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEvent?.objectId, vendors]);
+
   // Resolve stale booth links from legacy map data to current vendor slugs.
   const booths: BoothPosition[] = (selectedEvent?.boothMap ?? []).map((booth) => {
     const currentSlug = (booth.vendorSlug || "").trim();
-    if (currentSlug && vendorSlugToSlug.has(currentSlug)) {
-      return booth;
-    }
+    const resolvedVendor = resolveVendorForBooth(booth);
 
     const fallbackById = booth.vendorId ? vendorsById.get(booth.vendorId) : undefined;
     const fallbackByName = booth.vendorName
-      ? vendorsByNormalizedName.get(normalizeVendorKey(booth.vendorName))
+      ? vendorsByNormalizedName.get(normalizeVendorKey(booth.vendorName)) ||
+        fallbackSlugByName.get(normalizeVendorKey(booth.vendorName))
       : undefined;
 
-    const resolvedSlug = fallbackById || fallbackByName || currentSlug;
-    return { ...booth, vendorSlug: resolvedSlug };
+    const resolvedSlug =
+      resolvedVendor?.slug || fallbackById || fallbackByName || currentSlug;
+    const fallbackRating = resolvedSlug ? ratingsBySlug.get(resolvedSlug) : undefined;
+    const vendorAverage = Number(resolvedVendor?.averageRating);
+    const vendorCount = Number(resolvedVendor?.reviewCount);
+
+    return {
+      ...booth,
+      vendorSlug: resolvedSlug,
+      averageRating:
+        Number.isFinite(vendorAverage) && vendorAverage > 0
+          ? vendorAverage
+          : fallbackRating?.average ?? null,
+      reviewCount:
+        Number.isFinite(vendorCount) && vendorCount > 0
+          ? vendorCount
+          : fallbackRating?.count ?? null,
+    };
   });
 
   return (
