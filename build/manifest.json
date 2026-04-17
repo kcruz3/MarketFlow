@@ -1,9 +1,0 @@
-{
-  "short_name": "MarketFlow",
-  "name": "MarketFlow Vendor Marketplace",
-  "icons": [],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#2f5d50",
-  "background_color": "#f8f4ec"
-}

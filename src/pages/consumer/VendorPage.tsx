@@ -31,6 +31,8 @@ export default function VendorPage() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [itemSearch, setItemSearch] = useState("");
+  const [itemFilter, setItemFilter] = useState<"all" | "available" | "out-of-stock">("all");
   const [orderConfirmation, setOrderConfirmation] = useState<string | null>(
     null
   );
@@ -71,6 +73,24 @@ export default function VendorPage() {
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : null;
   const availableItems = items.filter((i) => i.available);
+  const normalizedItemSearch = itemSearch.trim().toLowerCase();
+  const itemCategories = Array.from(
+    new Set(items.map((item) => item.category).filter(Boolean))
+  );
+  const filteredItems = items.filter((item) => {
+    const matchesSearch =
+      !normalizedItemSearch ||
+      item.name.toLowerCase().includes(normalizedItemSearch) ||
+      item.description?.toLowerCase().includes(normalizedItemSearch) ||
+      item.category?.toLowerCase().includes(normalizedItemSearch);
+
+    const matchesFilter =
+      itemFilter === "all" ||
+      (itemFilter === "available" && item.available) ||
+      (itemFilter === "out-of-stock" && !item.available);
+
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div>
@@ -249,62 +269,136 @@ export default function VendorPage() {
                     <p>This vendor hasn't added their menu yet</p>
                   </div>
                 ) : (
-                  <div
-                    style={{ display: "flex", flexDirection: "column", gap: 0 }}
-                  >
-                    {items.map((item, i) => (
-                      <div
-                        key={item.objectId}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="Search products, descriptions, or categories..."
+                        value={itemSearch}
+                        onChange={(e) => setItemSearch(e.target.value)}
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "12px 0",
-                          borderBottom:
-                            i < items.length - 1
-                              ? "1px solid var(--cream-dark)"
-                              : "none",
-                          opacity: item.available ? 1 : 0.5,
+                          flex: 1,
+                          minWidth: 240,
+                          padding: "10px 14px",
+                          borderRadius: 999,
+                          border: "1px solid var(--cream-dark)",
+                          background: "var(--cream)",
+                          fontSize: 14,
+                          fontFamily: "DM Sans, sans-serif",
+                          outline: "none",
                         }}
+                      />
+                      <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+                        {filteredItems.length} result{filteredItems.length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+
+                    <div className="filter-bar" style={{ margin: 0 }}>
+                      {(["all", "available", "out-of-stock"] as const).map((filter) => (
+                        <button
+                          key={filter}
+                          className={`filter-chip ${itemFilter === filter ? "active" : ""}`}
+                          onClick={() => setItemFilter(filter)}
+                          style={{ textTransform: "capitalize" }}
+                        >
+                          {filter === "out-of-stock" ? "Out of stock" : filter}
+                        </button>
+                      ))}
+                      {itemCategories.map((category) => (
+                        <span
+                          key={category}
+                          className="badge badge-gray"
+                          style={{ alignSelf: "center" }}
+                        >
+                          {category}
+                        </span>
+                      ))}
+                    </div>
+
+                    {filteredItems.length === 0 ? (
+                      <div className="empty-state" style={{ padding: "28px 0" }}>
+                        <h3>No matching items</h3>
+                        <p>Try a different search or switch your availability filter</p>
+                      </div>
+                    ) : (
+                      <div
+                        style={{ display: "flex", flexDirection: "column", gap: 0 }}
                       >
-                        <div>
-                          <div style={{ fontWeight: 500, fontSize: 14 }}>
-                            {item.name}
-                          </div>
-                          {item.description && (
+                        {filteredItems.map((item, i) => (
+                          <div
+                            key={item.objectId}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "12px 0",
+                              borderBottom:
+                                i < filteredItems.length - 1
+                                  ? "1px solid var(--cream-dark)"
+                                  : "none",
+                              opacity: item.available ? 1 : 0.5,
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                  marginBottom: item.description ? 3 : 0,
+                                }}
+                              >
+                                <div style={{ fontWeight: 500, fontSize: 14 }}>
+                                  {item.name}
+                                </div>
+                                {item.category && (
+                                  <span className="badge badge-gray">{item.category}</span>
+                                )}
+                              </div>
+                              {item.description && (
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    color: "var(--text-muted)",
+                                  }}
+                                >
+                                  {item.description}
+                                </div>
+                              )}
+                              {!item.available && (
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    color: "var(--text-muted)",
+                                  }}
+                                >
+                                  Out of stock
+                                </span>
+                              )}
+                            </div>
                             <div
                               style={{
-                                fontSize: 12,
-                                color: "var(--text-muted)",
+                                fontWeight: 500,
+                                fontSize: 15,
+                                color: "var(--forest)",
+                                marginLeft: 16,
+                                flexShrink: 0,
                               }}
                             >
-                              {item.description}
+                              ${item.price.toFixed(2)}
                             </div>
-                          )}
-                          {!item.available && (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                color: "var(--text-muted)",
-                              }}
-                            >
-                              Out of stock
-                            </span>
-                          )}
-                        </div>
-                        <div
-                          style={{
-                            fontWeight: 500,
-                            fontSize: 15,
-                            color: "var(--forest)",
-                            marginLeft: 16,
-                            flexShrink: 0,
-                          }}
-                        >
-                          ${item.price.toFixed(2)}
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </div>
