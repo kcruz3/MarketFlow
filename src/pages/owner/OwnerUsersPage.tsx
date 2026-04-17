@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useUsers, ManagedUser } from "../../hooks/useUsers";
 import { useAuthContext } from "../../context/AuthContext";
 import { UserRole } from "../../hooks/useAuth";
-import { IconRefresh } from "../../components/Icons";
+import { IconRefresh, IconTrash } from "../../components/Icons";
 
 const ROLES: UserRole[] = ["owner", "admin", "vendor", "customer"];
 
@@ -36,10 +36,11 @@ function RoleBadge({ role }: { role: UserRole }) {
 
 export default function OwnerUsersPage() {
   const { user: currentUser } = useAuthContext();
-  const { users, loading, error, changeRole, refetch } = useUsers();
+  const { users, loading, error, changeRole, deleteUser, refetch } = useUsers();
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState<UserRole | "all">("all");
   const [changing, setChanging] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmChange, setConfirmChange] = useState<{
     userId: string;
     userEmail: string;
@@ -86,6 +87,27 @@ export default function OwnerUsersPage() {
       alert("Failed to change role: " + e.message);
     } finally {
       setChanging(null);
+    }
+  };
+
+  const handleDelete = async (managedUser: ManagedUser) => {
+    if (managedUser.objectId === currentUser?.objectId) {
+      alert("You can't delete your own owner account.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${managedUser.email}? This will permanently remove the user account and any vendor profile linked to it.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(managedUser.objectId);
+    try {
+      await deleteUser(managedUser.objectId);
+    } catch (e: any) {
+      alert("Failed to delete user: " + (e.message || "Unknown error"));
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -204,6 +226,7 @@ export default function OwnerUsersPage() {
                     <th>Current Role</th>
                     <th>Joined</th>
                     <th>Change Role</th>
+                    <th>Delete</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -274,12 +297,52 @@ export default function OwnerUsersPage() {
                           </select>
                         )}
                       </td>
+                      <td>
+                        {deleting === u.objectId ? (
+                          <span
+                            style={{ fontSize: 13, color: "var(--text-muted)" }}
+                          >
+                            Deleting...
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleDelete(u)}
+                            disabled={u.objectId === currentUser?.objectId}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              padding: "7px 10px",
+                              borderRadius: 999,
+                              border: "1px solid rgba(205, 125, 125, 0.35)",
+                              background:
+                                u.objectId === currentUser?.objectId
+                                  ? "rgba(255,255,255,0.5)"
+                                  : "#fff4f4",
+                              color:
+                                u.objectId === currentUser?.objectId
+                                  ? "var(--text-muted)"
+                                  : "#b42318",
+                              cursor:
+                                u.objectId === currentUser?.objectId
+                                  ? "not-allowed"
+                                  : "pointer",
+                              fontSize: 12.5,
+                              fontFamily: "DM Sans, sans-serif",
+                              fontWeight: 600,
+                            }}
+                          >
+                            <IconTrash size={13} />
+                            Delete
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {filtered.length === 0 && (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         style={{
                           textAlign: "center",
                           padding: 32,

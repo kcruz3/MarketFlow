@@ -82,5 +82,10 @@ export function useUsers() {
     );
   };
 
-  return { users, loading, error, changeRole, refetch: fetchUsers };
+  const deleteUser = async (userId: string) => {
+    await Parse.Cloud.run("deleteUserAsOwner", { userId });
+    setUsers((prev) => prev.filter((user) => user.objectId !== userId));
+  };
+
+  return { users, loading, error, changeRole, deleteUser, refetch: fetchUsers };
 }

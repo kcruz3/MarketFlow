@@ -100,6 +100,49 @@ Parse.Cloud.define("getAllUsers", async (request) => {
   }));
 });
 
+Parse.Cloud.define("deleteUserAsOwner", async (request) => {
+  await requireOwnerUser(request.user);
+
+  const userId = request.params?.userId;
+  if (!userId || typeof userId !== "string") {
+    throw new Parse.Error(
+      Parse.Error.INVALID_QUERY,
+      "userId is required."
+    );
+  }
+
+  if (request.user.id === userId) {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      "You cannot delete your own owner account."
+    );
+  }
+
+  const userQuery = new Parse.Query(Parse.User);
+  const user = await userQuery.get(userId, { useMasterKey: true });
+
+  const vendorQuery = new Parse.Query("Vendor");
+  vendorQuery.equalTo("ownerId", userId);
+  vendorQuery.limit(1000);
+  const linkedVendors = await vendorQuery.find({ useMasterKey: true });
+  if (linkedVendors.length > 0) {
+    await Parse.Object.destroyAll(linkedVendors, { useMasterKey: true });
+  }
+
+  const rolesQuery = new Parse.Query(Parse.Role);
+  rolesQuery.containedIn("name", ["owner", "admin", "vendor", "customer"]);
+  rolesQuery.limit(100);
+  const roles = await rolesQuery.find({ useMasterKey: true });
+  roles.forEach((role) => role.getUsers().remove(user));
+  if (roles.length > 0) {
+    await Parse.Object.saveAll(roles, { useMasterKey: true });
+  }
+
+  await user.destroy({ useMasterKey: true });
+
+  return { success: true, userId };
+});
+
 Parse.Cloud.define("createOrderWithInventory", async (request) => {
   const user = request.user;
   if (!user) {
