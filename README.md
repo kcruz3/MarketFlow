@@ -101,6 +101,8 @@ Make sure Public Read access is enabled on `Vendor` and `MarketEvent` for unauth
 
 Admin review deletion now uses a Parse Cloud Function in [cloud/main.js](/Users/kathryncruz/Desktop/MarketFlow/cloud/main.js) named `deleteReviewAsAdmin`.
 
+Customer checkout inventory reservation also runs through Cloud Code using `createOrderWithInventory`, so updated stock counts can be enforced server-side when an order is placed.
+
 To deploy it to Back4App:
 
 1. Install the Back4App CLI:

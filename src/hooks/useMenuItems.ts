@@ -9,8 +9,28 @@ export interface MenuItem {
   price: number;
   category: string;
   imageUrl?: string;
+  inventoryCount: number | null;
   available: boolean;
   isActive: boolean;
+}
+
+function mapMenuItem(record: Parse.Object): MenuItem {
+  const rawInventory = record.get('inventoryCount');
+  const inventoryCount =
+    typeof rawInventory === 'number' && Number.isFinite(rawInventory)
+      ? rawInventory
+      : null;
+  const available =
+    inventoryCount !== null
+      ? inventoryCount > 0
+      : Boolean(record.get('available'));
+
+  return {
+    objectId: record.id!,
+    ...record.attributes,
+    inventoryCount,
+    available,
+  } as MenuItem;
 }
 
 export function useMenuItems(vendorSlug: string) {
@@ -26,7 +46,7 @@ export function useMenuItems(vendorSlug: string) {
       query.equalTo('isActive', true);
       query.ascending('category');
       const results = await query.find();
-      setItems(results.map(r => ({ objectId: r.id, ...r.attributes } as MenuItem)));
+      setItems(results.map(mapMenuItem));
     } finally {
       setLoading(false);
     }
@@ -34,15 +54,20 @@ export function useMenuItems(vendorSlug: string) {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  const addItem = async (data: Omit<MenuItem, 'objectId' | 'vendorSlug' | 'isActive'>) => {
+  const addItem = async (data: Omit<MenuItem, 'objectId' | 'vendorSlug' | 'isActive' | 'available'>) => {
     const Obj = Parse.Object.extend('MenuItem');
     const obj = new Obj();
+    const rawInventoryCount = Number(data.inventoryCount ?? 0);
+    const inventoryCount = Number.isFinite(rawInventoryCount)
+      ? Math.max(0, Math.floor(rawInventoryCount))
+      : 0;
     obj.set('vendorSlug', vendorSlug);
     obj.set('name', data.name);
     obj.set('description', data.description);
     obj.set('price', data.price);
     obj.set('category', data.category);
-    obj.set('available', data.available);
+    obj.set('inventoryCount', inventoryCount);
+    obj.set('available', inventoryCount > 0);
     obj.set('isActive', true);
     if (data.imageUrl) obj.set('imageUrl', data.imageUrl);
 
@@ -56,12 +81,26 @@ export function useMenuItems(vendorSlug: string) {
     await fetchItems();
   };
 
-  const toggleAvailability = async (itemId: string, available: boolean) => {
+  const updateInventory = async (itemId: string, inventoryCount: number) => {
+    const sanitizedInventory = Number.isFinite(inventoryCount)
+      ? Math.max(0, Math.floor(inventoryCount))
+      : 0;
     const query = new Parse.Query('MenuItem');
     const obj = await query.get(itemId);
-    obj.set('available', available);
+    obj.set('inventoryCount', sanitizedInventory);
+    obj.set('available', sanitizedInventory > 0);
     await obj.save();
-    setItems(prev => prev.map(i => i.objectId === itemId ? { ...i, available } : i));
+    setItems((prev) =>
+      prev.map((item) =>
+        item.objectId === itemId
+          ? {
+              ...item,
+              inventoryCount: sanitizedInventory,
+              available: sanitizedInventory > 0,
+            }
+          : item
+      )
+    );
   };
 
   const deleteItem = async (itemId: string) => {
@@ -72,5 +111,5 @@ export function useMenuItems(vendorSlug: string) {
     setItems(prev => prev.filter(i => i.objectId !== itemId));
   };
 
-  return { items, loading, addItem, toggleAvailability, deleteItem, refetch: fetchItems };
+  return { items, loading, addItem, updateInventory, deleteItem, refetch: fetchItems };
 }

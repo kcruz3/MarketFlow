@@ -16,6 +16,7 @@ export interface Order {
   customerEmail: string;
   vendorSlug: string;
   vendorName: string;
+  orderNumber: string;
   eventId?: string;
   items: OrderItem[];
   subtotal: number;
@@ -32,6 +33,13 @@ function mapOrder(order: Parse.Object): Order {
     objectId: order.id!,
     ...order.attributes,
     createdAt: order.createdAt!,
+  } as Order;
+}
+
+function mapCloudOrder(order: any): Order {
+  return {
+    ...order,
+    createdAt: new Date(order.createdAt),
   } as Order;
 }
 
@@ -94,37 +102,8 @@ export async function createOrder(data: {
   notes: string;
   eventId?: string;
 }): Promise<Order> {
-  const subtotal = data.items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const qrCode = `MF-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-
-  const Obj = Parse.Object.extend('Order');
-  const obj = new Obj();
-  obj.set('customerId', data.customerId);
-  obj.set('customerEmail', data.customerEmail);
-  obj.set('vendorSlug', data.vendorSlug);
-  obj.set('vendorName', data.vendorName);
-  obj.set('items', data.items);
-  obj.set('subtotal', subtotal);
-  obj.set('total', subtotal); // no markup for cash pickup
-  obj.set('status', 'pending');
-  obj.set('pickupWindow', data.pickupWindow);
-  obj.set('notes', data.notes);
-  obj.set('qrCode', qrCode);
-  if (data.eventId) obj.set('eventId', data.eventId);
-
-  // ACL: customer can read, vendor can read+write status, admins full access
-  const acl = new Parse.ACL();
-  acl.setPublicReadAccess(false);
-  acl.setWriteAccess(data.customerId, false);
-  acl.setReadAccess(data.customerId, true);
-  acl.setRoleReadAccess('admin', true);
-  acl.setRoleWriteAccess('admin', true);
-  acl.setRoleReadAccess('vendor', true);
-  acl.setRoleWriteAccess('vendor', true);
-  obj.setACL(acl);
-
-  await obj.save();
-  return mapOrder(obj);
+  const order = await Parse.Cloud.run('createOrderWithInventory', data);
+  return mapCloudOrder(order);
 }
 
 // Vendor: fetch their own orders

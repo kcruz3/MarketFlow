@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import { useVendorOrders, OrderStatus, OrderItem } from "../../hooks/useOrders";
 import { useMenuItems } from "../../hooks/useMenuItems";
@@ -13,6 +13,7 @@ import {
   IconClock,
   IconCalendar,
   IconPin,
+  IconPlus,
 } from "../../components/Icons";
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -47,7 +48,7 @@ export default function VendorDashboard() {
     items,
     loading: mLoading,
     addItem,
-    toggleAvailability,
+    updateInventory,
     deleteItem,
   } = useMenuItems(vendorSlug);
   const { events, loading: eLoading } = useMarketEvents();
@@ -62,7 +63,21 @@ export default function VendorDashboard() {
   const [newDesc, setNewDesc] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newCategory, setNewCategory] = useState("");
+  const [newInventoryCount, setNewInventoryCount] = useState("0");
   const [addingItem, setAddingItem] = useState(false);
+  const [inventoryDrafts, setInventoryDrafts] = useState<Record<string, string>>({});
+  const [savingInventoryId, setSavingInventoryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setInventoryDrafts((prev) => {
+      const next: Record<string, string> = {};
+      items.forEach((item) => {
+        next[item.objectId] =
+          prev[item.objectId] ?? String(item.inventoryCount ?? 0);
+      });
+      return next;
+    });
+  }, [items]);
 
   const activeOrders = orders.filter(
     (o) => !["fulfilled", "cancelled"].includes(o.status)
@@ -87,16 +102,42 @@ export default function VendorDashboard() {
         description: newDesc,
         price: parseFloat(newPrice),
         category: newCategory || "General",
-        available: true,
+        inventoryCount: Number(newInventoryCount || 0),
       });
       setNewName("");
       setNewDesc("");
       setNewPrice("");
       setNewCategory("");
+      setNewInventoryCount("0");
       setShowAddItem(false);
     } finally {
       setAddingItem(false);
     }
+  };
+
+  const saveInventory = async (itemId: string, nextValue: string) => {
+    const parsedValue = Number.parseInt(nextValue || "0", 10);
+    const sanitizedValue = Number.isFinite(parsedValue)
+      ? Math.max(0, parsedValue)
+      : 0;
+
+    setInventoryDrafts((prev) => ({
+      ...prev,
+      [itemId]: String(sanitizedValue),
+    }));
+    setSavingInventoryId(itemId);
+    try {
+      await updateInventory(itemId, sanitizedValue);
+    } finally {
+      setSavingInventoryId(null);
+    }
+  };
+
+  const adjustInventory = async (itemId: string, delta: number) => {
+    const currentValue = Number(inventoryDrafts[itemId] || 0);
+    const nextValue = String(Math.max(0, currentValue + delta));
+    setInventoryDrafts((prev) => ({ ...prev, [itemId]: nextValue }));
+    await saveInventory(itemId, nextValue);
   };
 
   return (
@@ -312,10 +353,9 @@ export default function VendorDashboard() {
                                 fontSize: 11,
                                 color: "var(--text-muted)",
                                 marginTop: 6,
-                                fontFamily: "monospace",
                               }}
                             >
-                              {order.qrCode}
+                              Order #{order.orderNumber || order.qrCode}
                             </div>
                           </div>
                         </div>
@@ -444,6 +484,27 @@ export default function VendorDashboard() {
                         gap: 6,
                       }}
                     >
+                  <label style={{ fontSize: 13, fontWeight: 500 }}>
+                        Starting inventory *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={newInventoryCount}
+                        onChange={(e) => setNewInventoryCount(e.target.value)}
+                        placeholder="0"
+                        style={inputStyle}
+                        required
+                      />
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                      }}
+                    >
                       <label style={{ fontSize: 13, fontWeight: 500 }}>
                         Description
                       </label>
@@ -487,7 +548,8 @@ export default function VendorDashboard() {
                         <th>Item</th>
                         <th>Category</th>
                         <th>Price</th>
-                        <th>Available</th>
+                        <th>Inventory</th>
+                        <th>Status</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -516,30 +578,77 @@ export default function VendorDashboard() {
                             ${item.price.toFixed(2)}
                           </td>
                           <td>
-                            <button
-                              onClick={() =>
-                                toggleAvailability(
-                                  item.objectId,
-                                  !item.available
-                                )
-                              }
+                            <div
                               style={{
-                                padding: "4px 10px",
-                                borderRadius: 20,
-                                border: "none",
-                                cursor: "pointer",
-                                background: item.available
-                                  ? "var(--green-pale)"
-                                  : "var(--cream-dark)",
-                                color: item.available
-                                  ? "var(--green-mid)"
-                                  : "var(--text-muted)",
-                                fontSize: 12,
-                                fontFamily: "DM Sans, sans-serif",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
                               }}
                             >
-                              {item.available ? "In stock" : "Out of stock"}
-                            </button>
+                              <button
+                                onClick={() => adjustInventory(item.objectId, -1)}
+                                style={qtyButtonStyle}
+                                disabled={savingInventoryId === item.objectId}
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={inventoryDrafts[item.objectId] ?? String(item.inventoryCount ?? 0)}
+                                onChange={(e) =>
+                                  setInventoryDrafts((prev) => ({
+                                    ...prev,
+                                    [item.objectId]: e.target.value,
+                                  }))
+                                }
+                                onBlur={() =>
+                                  saveInventory(
+                                    item.objectId,
+                                    inventoryDrafts[item.objectId] ?? "0"
+                                  )
+                                }
+                                style={{
+                                  width: 72,
+                                  ...inputStyle,
+                                  padding: "7px 10px",
+                                }}
+                              />
+                              <button
+                                onClick={() => adjustInventory(item.objectId, 1)}
+                                style={qtyButtonStyle}
+                                disabled={savingInventoryId === item.objectId}
+                              >
+                                <IconPlus size={13} />
+                              </button>
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 4,
+                                alignItems: "flex-start",
+                              }}
+                            >
+                              <span
+                                className={`badge ${
+                                  item.available ? "badge-green" : "badge-gray"
+                                }`}
+                              >
+                                {item.available ? "In stock" : "Out of stock"}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "var(--text-muted)",
+                                }}
+                              >
+                                {item.inventoryCount} remaining
+                              </span>
+                            </div>
                           </td>
                           <td>
                             <button
@@ -552,7 +661,9 @@ export default function VendorDashboard() {
                                 fontSize: 16,
                                 padding: "0 4px",
                               }}
-                            ></button>
+                            >
+                              <IconTrash size={14} />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -761,4 +872,17 @@ const inputStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   background: "var(--cream)",
   color: "var(--text-primary)",
+};
+
+const qtyButtonStyle: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 999,
+  border: "1px solid var(--cream-dark)",
+  background: "var(--white)",
+  color: "var(--text-primary)",
+  cursor: "pointer",
 };

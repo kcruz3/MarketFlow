@@ -27,7 +27,7 @@ export default function VendorPage() {
   const { user } = useAuthContext();
   const { vendor, loading, error } = useVendor(slug || "");
   const { reviews, loading: rLoading, submitReview, deleteReview } = useReviews(slug || "");
-  const { items, loading: mLoading } = useMenuItems(slug || "");
+  const { items, loading: mLoading, refetch: refetchItems } = useMenuItems(slug || "");
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -44,9 +44,10 @@ export default function VendorPage() {
     setTimeout(() => setReviewSuccess(false), 4000);
   };
 
-  const handleOrderPlaced = (qrCode: string) => {
+  const handleOrderPlaced = (orderNumber: string) => {
     setShowCheckout(false);
-    setOrderConfirmation(qrCode);
+    setOrderConfirmation(orderNumber);
+    refetchItems();
   };
 
   if (loading)
@@ -72,7 +73,11 @@ export default function VendorPage() {
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : null;
-  const availableItems = items.filter((i) => i.available);
+  const availableItems = items.filter(
+    (item) =>
+      item.available &&
+      (item.inventoryCount === null || item.inventoryCount > 0)
+  );
   const normalizedItemSearch = itemSearch.trim().toLowerCase();
   const itemCategories = Array.from(
     new Set(items.map((item) => item.category).filter(Boolean))
@@ -147,7 +152,7 @@ export default function VendorPage() {
                 Order placed!
               </div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-                Show this code at the booth when you pick up
+                Show this order number at the booth when you pick up
               </div>
             </div>
             <div
@@ -176,7 +181,7 @@ export default function VendorPage() {
                   marginTop: 2,
                 }}
               >
-                Order code
+                Order number
               </div>
             </div>
             <button
@@ -362,6 +367,19 @@ export default function VendorPage() {
                                 {item.category && (
                                   <span className="badge badge-gray">{item.category}</span>
                                 )}
+                                <span
+                                  className={`badge ${
+                                    item.available ? "badge-green" : "badge-gray"
+                                  }`}
+                                >
+                                  {item.inventoryCount === null
+                                    ? item.available
+                                      ? "Available"
+                                      : "Out of stock"
+                                    : item.inventoryCount > 0
+                                    ? `${item.inventoryCount} left`
+                                    : "Out of stock"}
+                                </span>
                               </div>
                               {item.description && (
                                 <div

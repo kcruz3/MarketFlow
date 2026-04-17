@@ -11,7 +11,7 @@ const STATUS_STYLES: Record<OrderStatus, { bg: string; color: string; label: str
   cancelled: { bg: '#fdecea', color: '#c62828', label: 'Cancelled' },
 };
 
-function QRDisplay({ code }: { code: string }) {
+function OrderNumberDisplay({ code }: { code: string }) {
   return (
     <div style={{
       background: 'var(--forest)',
@@ -33,7 +33,7 @@ function QRDisplay({ code }: { code: string }) {
         {code}
       </div>
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '1px' }}>
-        Show at booth
+        Show at pickup
       </div>
     </div>
   );
@@ -113,13 +113,13 @@ function OrderCard({ order }: { order: Order }) {
             )}
           </div>
 
-          {/* QR code — show for active orders */}
+          {/* Order number — show for active orders */}
           {isActive && (
             <div>
               <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, marginBottom: 10 }}>
-                Pickup code
+                Order number
               </div>
-              <QRDisplay code={order.qrCode} />
+              <OrderNumberDisplay code={order.orderNumber || order.qrCode} />
             </div>
           )}
         </div>
@@ -150,7 +150,7 @@ export default function OrderHistoryPage() {
       <div className="page-content">
         <div className="page-header">
           <h2>Order History</h2>
-          <p>Track your pre-orders and pickup codes</p>
+          <p>Track your pre-orders and pickup order numbers</p>
         </div>
 
         {/* Stats */}

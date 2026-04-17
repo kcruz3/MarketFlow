@@ -8,7 +8,7 @@ interface Props {
   vendorName: string;
   items: MenuItem[];
   onClose: () => void;
-  onOrderPlaced: (qrCode: string) => void;
+  onOrderPlaced: (orderNumber: string) => void;
 }
 
 const PICKUP_WINDOWS = [
@@ -38,12 +38,22 @@ export default function CheckoutModal({
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
 
-  const availableItems = items.filter((i) => i.available);
+  const availableItems = items.filter(
+    (item) =>
+      item.available &&
+      (item.inventoryCount === null || item.inventoryCount > 0)
+  );
 
   const updateQty = (itemId: string, delta: number) => {
     setCart((prev) => {
       const current = prev[itemId] ?? 0;
-      const next = Math.max(0, current + delta);
+      const item = items.find((entry) => entry.objectId === itemId);
+      const rawNext = Math.max(0, current + delta);
+      const maxInventory =
+        item?.inventoryCount !== null && item?.inventoryCount !== undefined
+          ? item.inventoryCount
+          : Number.POSITIVE_INFINITY;
+      const next = Math.min(rawNext, maxInventory);
       if (next === 0) {
         const { [itemId]: _, ...rest } = prev;
         return rest;
@@ -93,7 +103,7 @@ export default function CheckoutModal({
         pickupWindow,
         notes,
       });
-      onOrderPlaced(order.qrCode);
+      onOrderPlaced(order.orderNumber || order.qrCode);
     } catch (e: any) {
       setError(e.message || "Failed to place order");
       setPlacing(false);
@@ -146,6 +156,12 @@ export default function CheckoutModal({
             >
               {availableItems.map((item) => {
                 const qty = cart[item.objectId] ?? 0;
+                const inventoryLabel =
+                  item.inventoryCount === null
+                    ? "Available today"
+                    : item.inventoryCount === 0
+                    ? "Out of stock"
+                    : `${item.inventoryCount} left`;
                 return (
                   <div key={item.objectId} style={s.itemRow}>
                     <div style={{ flex: 1 }}>
@@ -159,6 +175,15 @@ export default function CheckoutModal({
                           {item.description}
                         </div>
                       )}
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          marginTop: 3,
+                        }}
+                      >
+                        {inventoryLabel}
+                      </div>
                     </div>
                     <div
                       style={{ display: "flex", alignItems: "center", gap: 10 }}
@@ -194,6 +219,10 @@ export default function CheckoutModal({
                         <button
                           onClick={() => updateQty(item.objectId, 1)}
                           style={s.qtyBtn}
+                          disabled={
+                            item.inventoryCount !== null &&
+                            qty >= item.inventoryCount
+                          }
                         >
                           +
                         </button>
