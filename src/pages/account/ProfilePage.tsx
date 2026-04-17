@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import { IconSave } from "../../components/Icons";
+import { deriveDisplayName } from "../../lib/auth";
 
 function getProfileHeading(displayName: string, email?: string) {
   const trimmed = displayName.trim();
@@ -26,7 +27,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!user) return;
-    setDisplayName(user.displayName || user.username || "");
+    setDisplayName(user.displayName || deriveDisplayName(user.email || user.username));
     setPhone(user.phone || "");
     setBio(user.bio || "");
   }, [user]);
@@ -73,7 +74,7 @@ export default function ProfilePage() {
             <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "1.2px", color: "var(--text-muted)", fontWeight: 700, marginBottom: 10 }}>
               Account settings
             </div>
-            <h2>{getProfileHeading(displayName || user?.displayName || user?.username || "", user?.email)}</h2>
+            <h2>{getProfileHeading(displayName || user?.displayName || deriveDisplayName(user?.email || user?.username), user?.email)}</h2>
             <p>Update the details people see across reviews, orders, and your account.</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
@@ -148,7 +149,7 @@ export default function ProfilePage() {
                   <div style={fieldStyle}>
                     <label style={labelStyle}>Email</label>
                     <input value={user?.email || ""} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
-                    <span style={hintStyle}>Email stays the same for sign-in</span>
+                    <span style={hintStyle}>Use this email to sign in to your account.</span>
                   </div>
                   <div style={fieldStyle}>
                     <label style={labelStyle}>Phone</label>
@@ -186,11 +187,13 @@ export default function ProfilePage() {
                   </span>
                 </div>
                 <div>
-                  <div style={summaryLabelStyle}>Username</div>
-                  <div style={summaryValueStyle}>{user?.username}</div>
+                  <div style={summaryLabelStyle}>Display name</div>
+                  <div style={summaryValueStyle}>
+                    {user?.displayName || deriveDisplayName(user?.email || user?.username)}
+                  </div>
                 </div>
                 <div>
-                  <div style={summaryLabelStyle}>Email</div>
+                  <div style={summaryLabelStyle}>Sign-in email</div>
                   <div style={summaryValueStyle}>{user?.email}</div>
                 </div>
                 {user?.role === "vendor" && (

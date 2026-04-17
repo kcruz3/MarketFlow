@@ -22,9 +22,11 @@ export default function ReviewCard({ review, onDelete }: Props) {
   const date = new Date(review.createdAt).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
-
-  const initials = review.authorName
-    .split('@')[0]
+  const displayName = String(review.authorName || '').trim() || 'Customer';
+  const initials = displayName
+    .split(/\s+/)
+    .map((part) => part[0] || '')
+    .join('')
     .slice(0, 2)
     .toUpperCase();
 
@@ -44,7 +46,7 @@ export default function ReviewCard({ review, onDelete }: Props) {
       <div style={s.header}>
         <div style={s.avatar}>{initials}</div>
         <div style={{ flex: 1 }}>
-          <div style={s.author}>{review.authorName.split('@')[0]}</div>
+          <div style={s.author}>{displayName}</div>
           <div style={s.meta}>
             <Stars rating={review.rating} />
             <span style={s.date}>{date}</span>
@@ -78,7 +80,7 @@ export default function ReviewCard({ review, onDelete }: Props) {
         )}
       </div>
 
-      <p style={s.body}>{review.body}</p>
+      {review.body ? <p style={s.body}>{review.body}</p> : null}
 
       {review.photoUrl && (
         <img

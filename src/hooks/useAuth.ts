@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Parse from "../lib/parse";
-import { buildAuthUser } from "../lib/auth";
+import { buildAuthUser, deriveDisplayName } from "../lib/auth";
 export type { AuthUser, UserRole } from "../lib/auth";
 import type { AuthUser, UserRole } from "../lib/auth";
 
@@ -40,6 +40,7 @@ export function useAuth() {
     newUser.set("username", email);
     newUser.set("email", email);
     newUser.set("password", password);
+    newUser.set("displayName", deriveDisplayName(email));
     await newUser.signUp();
 
     const roleQuery = new Parse.Query(Parse.Role);
@@ -54,6 +55,7 @@ export function useAuth() {
       objectId: newUser.id!,
       email: newUser.get("email"),
       username: newUser.get("username"),
+      displayName: newUser.get("displayName"),
       role: "customer",
     });
   };

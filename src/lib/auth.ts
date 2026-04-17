@@ -15,6 +15,19 @@ export interface AuthUser {
 
 export const USER_ROLES: UserRole[] = ["owner", "admin", "vendor", "customer"];
 
+export function deriveDisplayName(loginValue?: string): string {
+  const value = String(loginValue || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  const localPart = value.includes("@") ? value.split("@")[0] : value;
+  return localPart
+    .replace(/[._-]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export async function fetchUserRole(user: Parse.User): Promise<UserRole> {
   for (const roleName of USER_ROLES) {
     const query = new Parse.Query(Parse.Role);
@@ -95,7 +108,7 @@ export async function buildAuthUser(user: Parse.User): Promise<AuthUser> {
     objectId: user.id!,
     email: user.get("email"),
     username: user.get("username"),
-    displayName: user.get("displayName") || user.get("username"),
+    displayName: user.get("displayName") || deriveDisplayName(user.get("email") || user.get("username")),
     phone: user.get("phone") || "",
     bio: user.get("bio") || "",
     role,

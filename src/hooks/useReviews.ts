@@ -7,7 +7,7 @@ export interface Review {
   authorName: string;
   authorId: string;
   rating: number;
-  body: string;
+  body?: string;
   photoUrl?: string;
   createdAt: Date;
 }
@@ -31,7 +31,7 @@ export function useReviews(vendorSlug: string) {
         authorName: r.get('authorName'),
         authorId: r.get('authorId'),
         rating: r.get('rating'),
-        body: r.get('body'),
+        body: r.get('body') || '',
         photoUrl: r.get('photoUrl'),
         createdAt: r.createdAt!,
       })));
@@ -59,44 +59,20 @@ export function useReviews(vendorSlug: string) {
       photoUrl = parseFile.url();
     }
 
-    const Review = Parse.Object.extend('Review');
-    const review = new Review();
-    review.set('vendorSlug', vendorSlug);
-    review.set('authorName', data.authorName);
-    review.set('authorId', data.authorId);
-    review.set('rating', data.rating);
-    review.set('body', data.body);
-    if (photoUrl) review.set('photoUrl', photoUrl);
-
-    // Set ACL — author can edit, public can read
-    const acl = new Parse.ACL();
-    acl.setPublicReadAccess(true);
-    acl.setWriteAccess(data.authorId, true);
-    acl.setRoleWriteAccess("admin", true);
-    acl.setRoleWriteAccess("owner", true);
-    review.setACL(acl);
-
-    await review.save();
-
-    // Update vendor average rating
-    const vendorQuery = new Parse.Query('Vendor');
-    vendorQuery.equalTo('slug', vendorSlug);
-    const vendor = await vendorQuery.first();
-    if (vendor) {
-      const allReviews = [...reviews, { rating: data.rating } as Review];
-      const avg = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
-      vendor.set('averageRating', Math.round(avg * 10) / 10);
-      vendor.set('reviewCount', allReviews.length);
-      await vendor.save();
-    }
+    await Parse.Cloud.run('createReviewForVendor', {
+      vendorSlug,
+      authorName: data.authorName,
+      authorId: data.authorId,
+      rating: data.rating,
+      body: data.body,
+      photoUrl,
+    });
 
     await fetchReviews();
   };
 
   const deleteReview = async (objectId: string) => {
-    const query = new Parse.Query('Review');
-    const review = await query.get(objectId);
-    await review.destroy();
+    await Parse.Cloud.run('deleteReviewAndRefresh', { reviewId: objectId });
     setReviews(prev => prev.filter(r => r.objectId !== objectId));
   };
 

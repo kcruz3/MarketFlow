@@ -41,10 +41,6 @@ export default function ReviewForm({ onSubmit, onCancel }: Props) {
       setError("Please select a star rating");
       return;
     }
-    if (body.trim().length < 10) {
-      setError("Review must be at least 10 characters");
-      return;
-    }
     if (!user) {
       setError("You must be logged in to review");
       return;
@@ -57,7 +53,7 @@ export default function ReviewForm({ onSubmit, onCancel }: Props) {
         rating,
         body: body.trim(),
         photo: photo || undefined,
-        authorName: user.email,
+        authorName: user.displayName || user.email,
         authorId: user.objectId,
       });
     } catch (e: any) {
@@ -113,11 +109,16 @@ export default function ReviewForm({ onSubmit, onCancel }: Props) {
 
       {/* Review text */}
       <div style={s.field}>
-        <label style={s.label}>Your review</label>
+        <label style={s.label}>
+          Your review{" "}
+          <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
+            (optional)
+          </span>
+        </label>
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="What did you love? What would you recommend?"
+          placeholder="Share more details if you want to"
           rows={4}
           style={s.textarea}
         />
