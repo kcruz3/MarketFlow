@@ -73,10 +73,13 @@ export function useAuth() {
       throw new Error("You must be logged in");
     }
 
-    current.set("displayName", data.displayName.trim());
-    current.set("phone", (data.phone || "").trim());
-    current.set("bio", (data.bio || "").trim());
-    await current.save();
+    await Parse.Cloud.run("updateMyProfile", {
+      displayName: data.displayName.trim(),
+      phone: (data.phone || "").trim(),
+      bio: (data.bio || "").trim(),
+    });
+
+    await current.fetch();
 
     const authUser = await buildAuthUser(current);
     setUser(authUser);

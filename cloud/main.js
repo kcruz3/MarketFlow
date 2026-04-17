@@ -346,6 +346,35 @@ Parse.Cloud.define("linkVendorToUser", async (request) => {
   };
 });
 
+Parse.Cloud.define("updateMyProfile", async (request) => {
+  const user = request.user;
+  if (!user) {
+    throw new Parse.Error(Parse.Error.SESSION_MISSING, "You must be logged in.");
+  }
+
+  const displayName = String(request.params?.displayName || "").trim();
+  const phone = String(request.params?.phone || "").trim();
+  const bio = String(request.params?.bio || "").trim();
+
+  if (!displayName) {
+    throw new Parse.Error(Parse.Error.VALIDATION_ERROR, "Display name is required.");
+  }
+
+  user.set("displayName", displayName);
+  user.set("phone", phone);
+  user.set("bio", bio);
+  await user.save(null, { useMasterKey: true });
+
+  return {
+    objectId: user.id,
+    displayName: user.get("displayName") || user.get("username") || "",
+    phone: user.get("phone") || "",
+    bio: user.get("bio") || "",
+    email: user.get("email") || "",
+    username: user.get("username") || "",
+  };
+});
+
 Parse.Cloud.define("createOrderWithInventory", async (request) => {
   const user = request.user;
   if (!user) {

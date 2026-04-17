@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthContext } from "../../context/AuthContext";
 import { IconCalendar, IconLeaf, IconShoppingCart, IconStore } from "../../components/Icons";
+import { useCustomerOrders, OrderStatus } from "../../hooks/useOrders";
 
 const featureCards = [
   {
@@ -21,9 +22,44 @@ const featureCards = [
   },
 ];
 
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  ready: "Ready for pickup",
+  fulfilled: "Picked up",
+  cancelled: "Cancelled",
+};
+
 export default function LandingPage() {
   const { user, logout } = useAuthContext();
   const navigate = useNavigate();
+  const { orders, loading } = useCustomerOrders(user?.objectId ?? "");
+
+  const latestActiveOrder = orders.find((order) => !["fulfilled", "cancelled"].includes(order.status));
+  const latestOrder = latestActiveOrder ?? null;
+  const panelTitle = user ? "Your latest order" : "Today at the market";
+  const orderNumber = latestOrder?.orderNumber || latestOrder?.qrCode || "No orders yet";
+  const vendorLabel = loading
+    ? "Checking your account"
+    : latestOrder
+      ? latestOrder.vendorName
+      : user
+        ? "Browse vendors and place your next pre-order"
+        : "Sign in to see your real pickup details here";
+  const pickupLabel = loading
+    ? "Loading..."
+    : latestOrder
+      ? latestOrder.pickupWindow
+      : user
+        ? "Your next pickup window will appear here"
+        : "Order windows update as vendors publish menus";
+  const statusLabel = loading
+    ? "Looking up latest order"
+    : latestOrder
+      ? ORDER_STATUS_LABELS[latestOrder.status]
+      : user
+        ? "Nothing scheduled right now"
+        : "Live order details show after you sign in";
 
   const handleLogout = async () => {
     await logout();
@@ -86,23 +122,23 @@ export default function LandingPage() {
           </div>
 
           <div className="landing-hero-panel">
-            <div className="landing-panel-title">Today at the market</div>
+            <div className="landing-panel-title">{panelTitle}</div>
             <div className="landing-order-chip">
               <span>Order number</span>
-              <strong>ORD-842311</strong>
+              <strong>{orderNumber}</strong>
             </div>
             <div className="landing-panel-list">
               <div>
                 <span>Vendor</span>
-                <strong>Fresh Fields Produce</strong>
+                <strong>{vendorLabel}</strong>
               </div>
               <div>
                 <span>Pickup</span>
-                <strong>10:30 - 11:00 AM</strong>
+                <strong>{pickupLabel}</strong>
               </div>
               <div>
                 <span>Status</span>
-                <strong>Ready for pickup</strong>
+                <strong>{statusLabel}</strong>
               </div>
             </div>
           </div>
