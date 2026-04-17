@@ -2,6 +2,19 @@ import React, { useEffect, useState } from "react";
 import { useAuthContext } from "../../context/AuthContext";
 import { IconSave } from "../../components/Icons";
 
+function getProfileHeading(displayName: string, email?: string) {
+  const trimmed = displayName.trim();
+  if (!trimmed) return "Your Profile";
+  if (email && trimmed.toLowerCase() === email.toLowerCase()) {
+    const localPart = email.split("@")[0]?.replace(/[._-]+/g, " ").trim();
+    if (localPart) {
+      return localPart.replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+    return "Your Profile";
+  }
+  return trimmed;
+}
+
 export default function ProfilePage() {
   const { user, updateProfile } = useAuthContext();
   const [displayName, setDisplayName] = useState("");
@@ -55,98 +68,19 @@ export default function ProfilePage() {
       </div>
 
       <div className="page-content">
-        <div
-          style={{
-            marginBottom: 28,
-            borderRadius: 28,
-            padding: "32px 34px",
-            background:
-              "linear-gradient(135deg, rgba(255,255,255,0.92), rgba(237,245,239,0.95))",
-            border: "1px solid rgba(179, 208, 188, 0.85)",
-            boxShadow: "var(--shadow-md)",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 24,
-            alignItems: "end",
-          }}
-        >
+        <div className="page-header" style={{ marginBottom: 18 }}>
           <div>
-            <div
-              style={{
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "1.4px",
-                color: "var(--text-muted)",
-                fontWeight: 700,
-                marginBottom: 12,
-              }}
-            >
+            <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "1.2px", color: "var(--text-muted)", fontWeight: 700, marginBottom: 10 }}>
               Account settings
             </div>
-            <h2
-              style={{
-                fontSize: 40,
-                lineHeight: 1.02,
-                color: "var(--forest)",
-                marginBottom: 10,
-              }}
-            >
-              {displayName || user?.displayName || user?.username || "Your profile"}
-            </h2>
-            <p
-              style={{
-                fontSize: 15,
-                color: "var(--text-secondary)",
-                lineHeight: 1.6,
-                maxWidth: 560,
-              }}
-            >
-              Keep your public-facing details up to date so orders, reviews, and
-              vendor conversations feel more personal and trustworthy.
-            </p>
+            <h2>{getProfileHeading(displayName || user?.displayName || user?.username || "", user?.email)}</h2>
+            <p>Update the details people see across reviews, orders, and your account.</p>
           </div>
-
-          <div
-            style={{
-              justifySelf: "end",
-              width: "100%",
-              maxWidth: 220,
-              padding: "18px 20px",
-              borderRadius: 22,
-              background: "rgba(23, 53, 40, 0.95)",
-              color: "white",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "1.2px",
-                color: "rgba(255,255,255,0.55)",
-                marginBottom: 8,
-              }}
-            >
-              Current role
-            </div>
-            <div
-              style={{
-                fontFamily: "Playfair Display, serif",
-                fontSize: 28,
-                marginBottom: 4,
-                textTransform: "capitalize",
-              }}
-            >
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <span className="badge badge-gray" style={{ textTransform: "capitalize" }}>
               {user?.role}
-            </div>
-            <div
-              style={{
-                fontSize: 12.5,
-                color: "rgba(255,255,255,0.7)",
-                lineHeight: 1.5,
-              }}
-            >
-              Your sign-in email stays the same, but your display details can change anytime.
-            </div>
+            </span>
+            <span className="badge badge-gray">{user?.email}</span>
           </div>
         </div>
 
@@ -254,6 +188,10 @@ export default function ProfilePage() {
                 <div>
                   <div style={summaryLabelStyle}>Username</div>
                   <div style={summaryValueStyle}>{user?.username}</div>
+                </div>
+                <div>
+                  <div style={summaryLabelStyle}>Email</div>
+                  <div style={summaryValueStyle}>{user?.email}</div>
                 </div>
                 {user?.role === "vendor" && (
                   <div>

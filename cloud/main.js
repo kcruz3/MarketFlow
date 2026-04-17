@@ -16,6 +16,24 @@ async function requireAdminUser(user) {
   }
 }
 
+async function requireOwnerUser(user) {
+  if (!user) {
+    throw new Parse.Error(Parse.Error.SESSION_MISSING, "You must be logged in.");
+  }
+
+  const roleQuery = new Parse.Query(Parse.Role);
+  roleQuery.equalTo("name", "owner");
+  roleQuery.equalTo("users", user);
+
+  const role = await roleQuery.first({ useMasterKey: true });
+  if (!role) {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      "Owner access is required."
+    );
+  }
+}
+
 function createOrderAcl(customerId) {
   const acl = new Parse.ACL();
   acl.setPublicReadAccess(false);
@@ -64,6 +82,22 @@ Parse.Cloud.define("deleteReviewAsAdmin", async (request) => {
   await review.destroy({ useMasterKey: true });
 
   return { success: true, reviewId };
+});
+
+Parse.Cloud.define("getAllUsers", async (request) => {
+  await requireOwnerUser(request.user);
+
+  const userQuery = new Parse.Query(Parse.User);
+  userQuery.ascending("createdAt");
+  userQuery.limit(1000);
+  const users = await userQuery.find({ useMasterKey: true });
+
+  return users.map((user) => ({
+    objectId: user.id,
+    email: user.get("email") || "",
+    username: user.get("username") || "",
+    createdAt: user.createdAt.toISOString(),
+  }));
 });
 
 Parse.Cloud.define("createOrderWithInventory", async (request) => {

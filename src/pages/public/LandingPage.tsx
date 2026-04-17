@@ -1,5 +1,6 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuthContext } from "../../context/AuthContext";
 import { IconCalendar, IconLeaf, IconShoppingCart, IconStore } from "../../components/Icons";
 
 const featureCards = [
@@ -21,6 +22,14 @@ const featureCards = [
 ];
 
 export default function LandingPage() {
+  const { user, logout } = useAuthContext();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/welcome");
+  };
+
   return (
     <div
       style={{
@@ -71,12 +80,20 @@ export default function LandingPage() {
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link className="btn btn-secondary" to="/login">
-              Sign in
-            </Link>
-            <Link className="btn btn-primary" to="/signup">
-              Create account
-            </Link>
+            {user ? (
+              <button className="btn btn-secondary" onClick={handleLogout}>
+                Log out
+              </button>
+            ) : (
+              <>
+                <Link className="btn btn-secondary" to="/login">
+                  Sign in
+                </Link>
+                <Link className="btn btn-primary" to="/signup">
+                  Create account
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -100,12 +117,25 @@ export default function LandingPage() {
                 to browse, order ahead, and track pickup details all in one place.
               </div>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Link className="btn btn-primary" to="/signup">
-                  Start browsing
-                </Link>
-                <Link className="btn btn-secondary" to="/login">
-                  I already have an account
-                </Link>
+                {user ? (
+                  <>
+                    <Link className="btn btn-primary" to="/">
+                      Open market map
+                    </Link>
+                    <button className="btn btn-secondary" onClick={handleLogout}>
+                      Log out
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link className="btn btn-primary" to="/signup">
+                      Start browsing
+                    </Link>
+                    <Link className="btn btn-secondary" to="/login">
+                      I already have an account
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
 
@@ -244,12 +274,25 @@ export default function LandingPage() {
             Built for a real market flow, not just a demo checkout.
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link className="btn btn-secondary" to="/login">
-              Sign in
-            </Link>
-            <Link className="btn btn-primary" to="/signup">
-              Join MarketFlow
-            </Link>
+            {user ? (
+              <>
+                <Link className="btn btn-primary" to="/">
+                  Go to app
+                </Link>
+                <button className="btn btn-secondary" onClick={handleLogout}>
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link className="btn btn-secondary" to="/login">
+                  Sign in
+                </Link>
+                <Link className="btn btn-primary" to="/signup">
+                  Join MarketFlow
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

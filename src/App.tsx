@@ -41,6 +41,7 @@ function AppShell() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/vendor/apply" element={<VendorApplyPage />} />
+          <Route path="/welcome" element={<LandingPage />} />
 
           <Route
             path="/"
