@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Parse from "../lib/parse";
-import { USER_ROLES, fetchUserRoleAssignments } from "../lib/auth";
+import { USER_ROLES } from "../lib/auth";
 import type { UserRole } from "../lib/auth";
 
 export interface ManagedUser {
@@ -25,15 +25,15 @@ export function useUsers() {
         objectId: string;
         email: string;
         username: string;
+        role: UserRole;
         createdAt: string;
       }>;
-      const roleAssignments = await fetchUserRoleAssignments();
 
       const withRoles = rawUsers.map((user) => ({
         objectId: user.objectId,
         email: user.email,
         username: user.username,
-        role: roleAssignments.get(user.objectId) ?? "customer",
+        role: user.role ?? "customer",
         createdAt: new Date(user.createdAt),
       }));
 

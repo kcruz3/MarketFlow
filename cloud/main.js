@@ -91,11 +91,31 @@ Parse.Cloud.define("getAllUsers", async (request) => {
   userQuery.ascending("createdAt");
   userQuery.limit(1000);
   const users = await userQuery.find({ useMasterKey: true });
+  const roleAssignments = new Map();
+
+  // Apply roles in priority order so owner/admin win over customer when a
+  // user exists in multiple Parse roles.
+  for (const roleName of ["owner", "admin", "vendor", "customer"]) {
+    const roleQuery = new Parse.Query(Parse.Role);
+    roleQuery.equalTo("name", roleName);
+    const role = await roleQuery.first({ useMasterKey: true });
+    if (!role) continue;
+
+    const roleUsers = await role.getUsers().query().limit(1000).find({
+      useMasterKey: true,
+    });
+    roleUsers.forEach((roleUser) => {
+      if (!roleAssignments.has(roleUser.id)) {
+        roleAssignments.set(roleUser.id, roleName);
+      }
+    });
+  }
 
   return users.map((user) => ({
     objectId: user.id,
     email: user.get("email") || "",
     username: user.get("username") || "",
+    role: roleAssignments.get(user.id) || "customer",
     createdAt: user.createdAt.toISOString(),
   }));
 });
