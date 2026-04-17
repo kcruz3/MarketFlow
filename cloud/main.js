@@ -46,6 +46,59 @@ function createOrderAcl(customerId) {
   return acl;
 }
 
+function createVendorSlug(name) {
+  return String(name || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+async function ensureUniqueVendorSlug(baseName) {
+  const seed = createVendorSlug(baseName) || "vendor";
+  let candidate = seed;
+  let attempt = 1;
+
+  while (attempt < 200) {
+    const slugQuery = new Parse.Query("Vendor");
+    slugQuery.equalTo("slug", candidate);
+    const existing = await slugQuery.first({ useMasterKey: true });
+    if (!existing) {
+      return candidate;
+    }
+
+    attempt += 1;
+    candidate = `${seed}-${attempt}`;
+  }
+
+  throw new Parse.Error(
+    Parse.Error.INTERNAL_SERVER_ERROR,
+    "Unable to generate a unique vendor slug."
+  );
+}
+
+async function getRoleAssignments() {
+  const roleAssignments = new Map();
+  for (const roleName of ["owner", "admin", "vendor", "customer"]) {
+    const roleQuery = new Parse.Query(Parse.Role);
+    roleQuery.equalTo("name", roleName);
+    const role = await roleQuery.first({ useMasterKey: true });
+    if (!role) continue;
+
+    const roleUsers = await role.getUsers().query().limit(1000).find({
+      useMasterKey: true,
+    });
+    roleUsers.forEach((roleUser) => {
+      if (!roleAssignments.has(roleUser.id)) {
+        roleAssignments.set(roleUser.id, roleName);
+      }
+    });
+  }
+  return roleAssignments;
+}
+
 function mapOrder(order) {
   return {
     objectId: order.id,
@@ -91,25 +144,7 @@ Parse.Cloud.define("getAllUsers", async (request) => {
   userQuery.ascending("createdAt");
   userQuery.limit(1000);
   const users = await userQuery.find({ useMasterKey: true });
-  const roleAssignments = new Map();
-
-  // Apply roles in priority order so owner/admin win over customer when a
-  // user exists in multiple Parse roles.
-  for (const roleName of ["owner", "admin", "vendor", "customer"]) {
-    const roleQuery = new Parse.Query(Parse.Role);
-    roleQuery.equalTo("name", roleName);
-    const role = await roleQuery.first({ useMasterKey: true });
-    if (!role) continue;
-
-    const roleUsers = await role.getUsers().query().limit(1000).find({
-      useMasterKey: true,
-    });
-    roleUsers.forEach((roleUser) => {
-      if (!roleAssignments.has(roleUser.id)) {
-        roleAssignments.set(roleUser.id, roleName);
-      }
-    });
-  }
+  const roleAssignments = await getRoleAssignments();
 
   return users.map((user) => ({
     objectId: user.id,
@@ -161,6 +196,154 @@ Parse.Cloud.define("deleteUserAsOwner", async (request) => {
   await user.destroy({ useMasterKey: true });
 
   return { success: true, userId };
+});
+
+Parse.Cloud.define("getUsersForVendorLinking", async (request) => {
+  await requireAdminUser(request.user);
+
+  const userQuery = new Parse.Query(Parse.User);
+  userQuery.ascending("email");
+  userQuery.limit(1000);
+  const users = await userQuery.find({ useMasterKey: true });
+  const roleAssignments = await getRoleAssignments();
+
+  return users.map((user) => ({
+    objectId: user.id,
+    email: user.get("email") || "",
+    username: user.get("username") || "",
+    role: roleAssignments.get(user.id) || "customer",
+    vendorSlug: user.get("vendorSlug") || "",
+  }));
+});
+
+Parse.Cloud.define("createVendorAsAdmin", async (request) => {
+  await requireAdminUser(request.user);
+
+  const {
+    name,
+    category,
+    subcategory,
+    description,
+    location,
+    website,
+    isOrganic,
+    acceptsPreOrder,
+    isActive,
+    userId,
+  } = request.params || {};
+
+  const vendorName = String(name || "").trim();
+  if (!vendorName) {
+    throw new Parse.Error(Parse.Error.INVALID_QUERY, "Vendor name is required.");
+  }
+
+  const slug = await ensureUniqueVendorSlug(vendorName);
+  const vendor = new Parse.Object("Vendor");
+  vendor.set("name", vendorName);
+  vendor.set("slug", slug);
+  vendor.set("category", String(category || "Prepared Food").trim());
+  vendor.set("subcategory", String(subcategory || "").trim());
+  vendor.set("description", String(description || "").trim());
+  vendor.set("location", String(location || "").trim());
+  vendor.set("website", String(website || "").trim());
+  vendor.set("isOrganic", Boolean(isOrganic));
+  vendor.set("acceptsPreOrder", acceptsPreOrder !== false);
+  vendor.set("isActive", isActive !== false);
+  vendor.set("tags", []);
+
+  let linkedUser = null;
+  if (typeof userId === "string" && userId.trim()) {
+    const userQuery = new Parse.Query(Parse.User);
+    linkedUser = await userQuery.get(userId, { useMasterKey: true });
+    vendor.set("ownerId", linkedUser.id);
+  }
+
+  await vendor.save(null, { useMasterKey: true });
+
+  if (linkedUser) {
+    linkedUser.set("vendorSlug", slug);
+    await linkedUser.save(null, { useMasterKey: true });
+
+    const vendorRoleQuery = new Parse.Query(Parse.Role);
+    vendorRoleQuery.equalTo("name", "vendor");
+    const vendorRole = await vendorRoleQuery.first({ useMasterKey: true });
+    if (vendorRole) {
+      vendorRole.getUsers().add(linkedUser);
+      await vendorRole.save(null, { useMasterKey: true });
+    }
+
+    const customerRoleQuery = new Parse.Query(Parse.Role);
+    customerRoleQuery.equalTo("name", "customer");
+    const customerRole = await customerRoleQuery.first({ useMasterKey: true });
+    if (customerRole) {
+      customerRole.getUsers().remove(linkedUser);
+      await customerRole.save(null, { useMasterKey: true });
+    }
+  }
+
+  return {
+    objectId: vendor.id,
+    name: vendor.get("name"),
+    slug: vendor.get("slug"),
+    ownerId: vendor.get("ownerId") || null,
+  };
+});
+
+Parse.Cloud.define("linkVendorToUser", async (request) => {
+  await requireAdminUser(request.user);
+
+  const vendorId = String(request.params?.vendorId || "").trim();
+  const userId = String(request.params?.userId || "").trim();
+
+  if (!vendorId || !userId) {
+    throw new Parse.Error(
+      Parse.Error.INVALID_QUERY,
+      "vendorId and userId are required."
+    );
+  }
+
+  const vendorQuery = new Parse.Query("Vendor");
+  const vendor = await vendorQuery.get(vendorId, { useMasterKey: true });
+  const vendorSlug = vendor.get("slug");
+  if (!vendorSlug) {
+    throw new Parse.Error(
+      Parse.Error.INVALID_QUERY,
+      "Vendor must have a slug before linking."
+    );
+  }
+
+  const userQuery = new Parse.Query(Parse.User);
+  const user = await userQuery.get(userId, { useMasterKey: true });
+
+  vendor.set("ownerId", user.id);
+  await vendor.save(null, { useMasterKey: true });
+
+  user.set("vendorSlug", vendorSlug);
+  await user.save(null, { useMasterKey: true });
+
+  const vendorRoleQuery = new Parse.Query(Parse.Role);
+  vendorRoleQuery.equalTo("name", "vendor");
+  const vendorRole = await vendorRoleQuery.first({ useMasterKey: true });
+  if (vendorRole) {
+    vendorRole.getUsers().add(user);
+    await vendorRole.save(null, { useMasterKey: true });
+  }
+
+  const customerRoleQuery = new Parse.Query(Parse.Role);
+  customerRoleQuery.equalTo("name", "customer");
+  const customerRole = await customerRoleQuery.first({ useMasterKey: true });
+  if (customerRole) {
+    customerRole.getUsers().remove(user);
+    await customerRole.save(null, { useMasterKey: true });
+  }
+
+  return {
+    success: true,
+    vendorId: vendor.id,
+    vendorSlug,
+    userId: user.id,
+    userEmail: user.get("email") || user.get("username") || "",
+  };
 });
 
 Parse.Cloud.define("createOrderWithInventory", async (request) => {

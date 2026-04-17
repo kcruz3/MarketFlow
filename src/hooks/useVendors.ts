@@ -22,6 +22,14 @@ export interface Vendor {
   ownerId?: string;
 }
 
+export interface VendorLinkableUser {
+  objectId: string;
+  email: string;
+  username: string;
+  role: "owner" | "admin" | "vendor" | "customer";
+  vendorSlug?: string;
+}
+
 export function useVendors(category?: string) {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +58,34 @@ export function useVendors(category?: string) {
   }, [fetchVendors]);
 
   return { vendors, loading, error, refetch: fetchVendors };
+}
+
+export async function getUsersForVendorLinking() {
+  return (await Parse.Cloud.run("getUsersForVendorLinking")) as VendorLinkableUser[];
+}
+
+export async function createVendorAsAdmin(data: {
+  name: string;
+  category?: string;
+  subcategory?: string;
+  description?: string;
+  location?: string;
+  website?: string;
+  userId?: string;
+}) {
+  await Parse.Cloud.run("createVendorAsAdmin", {
+    name: data.name,
+    category: data.category,
+    subcategory: data.subcategory,
+    description: data.description,
+    location: data.location,
+    website: data.website,
+    userId: data.userId,
+  });
+}
+
+export async function linkVendorToUser(vendorId: string, userId: string) {
+  await Parse.Cloud.run("linkVendorToUser", { vendorId, userId });
 }
 
 export async function deleteVendorAndUser(vendorId: string, ownerId?: string) {
