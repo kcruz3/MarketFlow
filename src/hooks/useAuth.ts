@@ -63,5 +63,25 @@ export function useAuth() {
     setUser(null);
   };
 
-  return { user, loading, login, signup, logout };
+  const updateProfile = async (data: {
+    displayName: string;
+    phone?: string;
+    bio?: string;
+  }) => {
+    const current = Parse.User.current();
+    if (!current) {
+      throw new Error("You must be logged in");
+    }
+
+    current.set("displayName", data.displayName.trim());
+    current.set("phone", (data.phone || "").trim());
+    current.set("bio", (data.bio || "").trim());
+    await current.save();
+
+    const authUser = await buildAuthUser(current);
+    setUser(authUser);
+    return authUser;
+  };
+
+  return { user, loading, login, signup, logout, refreshUser: loadUser, updateProfile };
 }

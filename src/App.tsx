@@ -13,6 +13,7 @@ import MapPage from "./pages/consumer/MapPage";
 import VendorsPage from "./pages/consumer/VendorsPage";
 import VendorPage from "./pages/consumer/VendorPage";
 import OrderHistoryPage from "./pages/consumer/OrderHistoryPage";
+import ProfilePage from "./pages/account/ProfilePage";
 
 import DashboardPage from "./pages/admin/DashboardPage";
 import AdminVendorsPage from "./pages/admin/VendorsPage";
@@ -66,6 +67,14 @@ function AppShell() {
             element={
               <ProtectedRoute>
                 <OrderHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
               </ProtectedRoute>
             }
           />

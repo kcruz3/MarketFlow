@@ -21,6 +21,7 @@ const consumerLinks = [
   { label: "Market Map", icon: <IconMap size={16} />, path: "/" },
   { label: "All Vendors", icon: <IconLeaf size={16} />, path: "/vendors" },
   { label: "My Orders", icon: <IconShoppingCart size={16} />, path: "/orders" },
+  { label: "My Profile", icon: <IconUsers size={16} />, path: "/profile" },
 ];
 
 const vendorLinks = [

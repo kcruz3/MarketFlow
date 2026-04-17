@@ -6,6 +6,9 @@ export interface AuthUser {
   objectId: string;
   email: string;
   username: string;
+  displayName?: string;
+  phone?: string;
+  bio?: string;
   role: UserRole;
   vendorSlug?: string;
 }
@@ -92,6 +95,9 @@ export async function buildAuthUser(user: Parse.User): Promise<AuthUser> {
     objectId: user.id!,
     email: user.get("email"),
     username: user.get("username"),
+    displayName: user.get("displayName") || user.get("username"),
+    phone: user.get("phone") || "",
+    bio: user.get("bio") || "",
     role,
     vendorSlug,
   };
