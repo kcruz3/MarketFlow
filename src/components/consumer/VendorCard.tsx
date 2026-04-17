@@ -15,7 +15,7 @@ const CategoryIcon = ({ category }: { category: string }) => {
   if (category === "Food & Beverage Producers")
     return <IconJar size={40} color="#c8841a" />;
   if (category === "Prepared Food")
-    return <IconUtensilsCrossed size={40} color="#c8441a" />;
+    return <IconUtensilsCrossed size={40} color="#b4642e" />;
   return <IconLeaf size={40} color="#888780" />;
 };
 

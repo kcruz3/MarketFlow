@@ -1,80 +1,105 @@
-import { IconMap, IconLeaf, IconClock, IconPin } from "../../components/Icons";
+import { IconMap } from "../../components/Icons";
 import React, { useState } from "react";
-import { useVendors } from "../../hooks/useVendors";
 import { useMarketEvents } from "../../hooks/useMarketEvents";
-import VendorCard from "../../components/consumer/VendorCard";
 import MarketMap, { BoothPosition } from "../../components/consumer/MarketMap";
 import {
   isUpcomingDate,
-  parseBoothMap,
+  splitEventsByDate,
   sortEventsByDateAsc,
 } from "../../lib/marketEvents";
 
-const CATEGORIES = [
-  "All",
-  "Farmers, Fishers, Foragers",
-  "Food & Beverage Producers",
-  "Prepared Food",
-];
+function normalizeVendorKey(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 export default function MapPage() {
-  const { vendors, loading } = useVendors();
   const { events, loading: eLoading } = useMarketEvents();
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [search, setSearch] = useState("");
-  const [mapTab, setMapTab] = useState<"map" | "list">("map");
+  const vendorsFromEvents = events.flatMap((event) => event.boothMap ?? []);
+  const vendorSlugToSlug = new Map(
+    vendorsFromEvents
+      .filter((booth) => booth.vendorSlug)
+      .map((booth) => [booth.vendorSlug, booth.vendorSlug])
+  );
+  const vendorsById = new Map(
+    vendorsFromEvents
+      .filter((booth) => booth.vendorId && booth.vendorSlug)
+      .map((booth) => [booth.vendorId!, booth.vendorSlug])
+  );
+  const vendorsByNormalizedName = new Map(
+    vendorsFromEvents
+      .filter((booth) => booth.vendorName && booth.vendorSlug)
+      .map((booth) => [normalizeVendorKey(booth.vendorName), booth.vendorSlug])
+  );
+  const [mapTab, setMapTab] = useState<"map" | "events">("map");
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const publishedEvents = sortEventsByDateAsc(
     events.filter((event) => event.isPublished && isUpcomingDate(event.date))
   );
+  const allPublishedEvents = sortEventsByDateAsc(
+    events.filter((event) => event.isPublished)
+  );
+  const publishedByDate = splitEventsByDate(allPublishedEvents);
+  const pastPublishedEvents = [...publishedByDate.past].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 
   const nextEvent = publishedEvents[0] ?? null;
+  const selectedEvent =
+    publishedEvents.find((event) => event.objectId === selectedEventId) ??
+    nextEvent;
 
-  // Build BoothPosition[] from the event's boothMap
-  const booths: BoothPosition[] = nextEvent
-    ? parseBoothMap(nextEvent.boothMap)
-    : [];
+  // Resolve stale booth links from legacy map data to current vendor slugs.
+  const booths: BoothPosition[] = (selectedEvent?.boothMap ?? []).map((booth) => {
+    const currentSlug = (booth.vendorSlug || "").trim();
+    if (currentSlug && vendorSlugToSlug.has(currentSlug)) {
+      return booth;
+    }
 
-  const filtered = vendors.filter((v) => {
-    const matchCat = activeCategory === "All" || v.category === activeCategory;
-    const matchSearch =
-      v.name.toLowerCase().includes(search.toLowerCase()) ||
-      v.description?.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
+    const fallbackById = booth.vendorId ? vendorsById.get(booth.vendorId) : undefined;
+    const fallbackByName = booth.vendorName
+      ? vendorsByNormalizedName.get(normalizeVendorKey(booth.vendorName))
+      : undefined;
+
+    const resolvedSlug = fallbackById || fallbackByName || currentSlug;
+    return { ...booth, vendorSlug: resolvedSlug };
   });
 
   return (
     <div>
       <div className="topbar">
         <div className="topbar-title">Market Map</div>
-        <div className="topbar-search">
-          <input
-            placeholder="Search vendors, products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
       </div>
 
       <div className="page-content">
         {/* Next event hero banner */}
-        {!eLoading && nextEvent && (
+        {!eLoading && selectedEvent && (
           <div style={s.heroBanner}>
             <div style={s.heroBannerLeft}>
-              <div style={s.heroBannerLabel}>Next market day</div>
-              <div style={s.heroBannerName}>{nextEvent.name}</div>
+              <div style={s.heroBannerLabel}>
+                {selectedEvent.objectId === nextEvent?.objectId
+                  ? "Next market day"
+                  : "Selected market day"}
+              </div>
+              <div style={s.heroBannerName}>{selectedEvent.name}</div>
               <div style={s.heroBannerDetails}>
-                <span>{nextEvent.hours}</span>
+                <span>{selectedEvent.hours}</span>
                 <span style={{ margin: "0 8px", opacity: 0.4 }}>·</span>
-                <span>{nextEvent.address}</span>
+                <span>{selectedEvent.address}</span>
               </div>
             </div>
             <div style={s.heroBannerDate}>
               <div style={s.heroBannerDay}>
-                {new Date(nextEvent.date).getDate()}
+                {new Date(selectedEvent.date).getDate()}
               </div>
               <div style={s.heroBannerMonth}>
-                {new Date(nextEvent.date).toLocaleString("default", {
+                {new Date(selectedEvent.date).toLocaleString("default", {
                   month: "long",
                 })}
               </div>
@@ -94,15 +119,19 @@ export default function MapPage() {
                 return (
                   <div
                     key={event.objectId}
+                    onClick={() => setSelectedEventId(event.objectId)}
                     style={{
                       ...s.eventCard,
+                      cursor: "pointer",
                       border:
-                        i === 0
+                        event.objectId === selectedEvent?.objectId
                           ? "2px solid var(--forest-mid)"
                           : "1px solid var(--cream-dark)",
                     }}
                   >
-                    {i === 0 && <div style={s.nextBadge}>Next market</div>}
+                    {event.objectId === nextEvent?.objectId && (
+                      <div style={s.nextBadge}>Next market</div>
+                    )}
                     <div style={s.eventCardDate}>
                       <div style={s.eventDay}>{date.getDate()}</div>
                       <div style={s.eventMonth}>
@@ -128,7 +157,7 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Map / List tabs */}
+        {/* Tabs */}
         <div
           style={{
             display: "flex",
@@ -137,7 +166,7 @@ export default function MapPage() {
             borderBottom: "1px solid var(--cream-dark)",
           }}
         >
-          {(["map", "list"] as const).map((t) => (
+          {(["map", "events"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setMapTab(t)}
@@ -159,7 +188,9 @@ export default function MapPage() {
                 textTransform: "capitalize",
               }}
             >
-              {t === "map" ? "Market Map" : "Browse Vendors"}
+              {t === "map"
+                ? "Market Map"
+                : "All Events"}
             </button>
           ))}
         </div>
@@ -167,9 +198,17 @@ export default function MapPage() {
         {/* MAP TAB */}
         {mapTab === "map" && (
           <div>
-            {nextEvent ? (
+            {selectedEvent ? (
               booths.length > 0 ? (
-                <MarketMap booths={booths} />
+                <>
+                  <div style={s.mapContext}>
+                    Showing booth map for{" "}
+                    <strong style={{ color: "var(--forest)" }}>
+                      {selectedEvent.name}
+                    </strong>
+                  </div>
+                  <MarketMap booths={booths} />
+                </>
               ) : (
                 <div className="map-container">
                   <div className="map-icon">
@@ -185,7 +224,7 @@ export default function MapPage() {
                     Booth layout not published yet
                   </div>
                   <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                    The admin hasn't assigned booths for this market day
+                    The admin hasn't assigned booths for {selectedEvent.name} yet
                   </div>
                 </div>
               )
@@ -211,60 +250,86 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* LIST TAB */}
-        {mapTab === "list" && (
-          <div>
-            <div
-              style={{
-                display: "flex",
-                gap: 16,
-                alignItems: "center",
-                marginBottom: 20,
-                flexWrap: "wrap",
-              }}
-            >
-              <div className="filter-bar" style={{ margin: 0 }}>
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    className={`filter-chip ${
-                      activeCategory === cat ? "active" : ""
-                    }`}
-                    onClick={() => setActiveCategory(cat)}
-                  >
-                    {cat === "Farmers, Fishers, Foragers"
-                      ? "Farmers"
-                      : cat === "Food & Beverage Producers"
-                      ? "Producers"
-                      : cat === "Prepared Food"
-                      ? "Prepared Food"
-                      : cat}
-                  </button>
-                ))}
+        {mapTab === "events" && (
+          <div style={{ display: "grid", gap: 16 }}>
+            <div className="card">
+              <div className="card-header">
+                <h3>Upcoming Events</h3>
+                <span className="badge badge-green">
+                  {publishedByDate.upcoming.length} upcoming
+                </span>
               </div>
-              <span
-                style={{
-                  fontSize: 13,
-                  color: "var(--text-muted)",
-                  marginLeft: "auto",
-                }}
-              >
-                {filtered.length} vendors
-              </span>
+              <div className="card-body">
+                {publishedByDate.upcoming.length === 0 ? (
+                  <div className="empty-state" style={{ padding: "28px 16px" }}>
+                    <h3>No upcoming events</h3>
+                    <p>Check back for the next published market day.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {publishedByDate.upcoming.map((event) => (
+                      <button
+                        key={event.objectId}
+                        onClick={() => {
+                          setSelectedEventId(event.objectId);
+                          setMapTab("map");
+                        }}
+                        style={{
+                          ...s.allEventsRow,
+                          borderColor:
+                            event.objectId === selectedEvent?.objectId
+                              ? "var(--forest-mid)"
+                              : "var(--cream-dark)",
+                        }}
+                      >
+                        <div style={s.allEventsDate}>
+                          {new Date(event.date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </div>
+                        <div style={s.allEventsInfo}>
+                          <div style={s.allEventsName}>{event.name}</div>
+                          <div style={s.allEventsMeta}>
+                            {event.hours} · {event.address}
+                          </div>
+                        </div>
+                        <span className="badge badge-amber">View on map</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {loading ? (
-              <div className="loading-spinner">Loading vendors...</div>
-            ) : filtered.length === 0 ? (
-              <div className="empty-state">
-                <h3>No vendors found</h3>
-                <p>Try adjusting your search or filter</p>
-              </div>
-            ) : (
-              <div className="vendor-grid">
-                {filtered.map((vendor) => (
-                  <VendorCard key={vendor.objectId} vendor={vendor} />
-                ))}
+            {pastPublishedEvents.length > 0 && (
+              <div className="card">
+                <div className="card-header">
+                  <h3>Past Events</h3>
+                  <span className="badge badge-gray">{pastPublishedEvents.length} past</span>
+                </div>
+                <div className="card-body">
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {pastPublishedEvents.map((event) => (
+                      <div key={event.objectId} style={s.pastEventsRow}>
+                        <div style={s.allEventsDate}>
+                          {new Date(event.date).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </div>
+                        <div style={s.allEventsInfo}>
+                          <div style={s.allEventsName}>{event.name}</div>
+                          <div style={s.allEventsMeta}>
+                            {event.hours} · {event.address}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -388,4 +453,45 @@ const s: Record<string, React.CSSProperties> = {
     marginBottom: 5,
   },
   eventMeta: { fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 },
+  mapContext: {
+    marginBottom: 10,
+    fontSize: 13,
+    color: "var(--text-secondary)",
+  },
+  allEventsRow: {
+    border: "1px solid var(--cream-dark)",
+    borderRadius: 10,
+    background: "var(--white)",
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "10px 12px",
+    textAlign: "left",
+  },
+  pastEventsRow: {
+    border: "1px solid var(--cream-dark)",
+    borderRadius: 10,
+    background: "var(--cream)",
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "10px 12px",
+  },
+  allEventsDate: {
+    fontSize: 12.5,
+    color: "var(--text-muted)",
+    minWidth: 118,
+    fontWeight: 600,
+  },
+  allEventsInfo: { flex: 1 },
+  allEventsName: {
+    fontWeight: 600,
+    fontSize: 14,
+    color: "var(--text-primary)",
+    marginBottom: 2,
+  },
+  allEventsMeta: {
+    fontSize: 12.5,
+    color: "var(--text-muted)",
+  },
 };

@@ -164,16 +164,29 @@ export default function AdminMapEditor({
   };
 
   const assignVendor = (boothId: string, vendor: Vendor) => {
-    const updated = booths.map((b) =>
-      b.boothId === boothId
-        ? {
-            ...b,
-            vendorSlug: vendor.slug,
-            vendorName: vendor.name,
-            category: vendor.category,
-          }
-        : b
-    );
+    // Keep one booth per vendor: move assignment from any previous booth.
+    const updated = booths.map((b) => {
+      if (b.boothId === boothId) {
+        return {
+          ...b,
+          vendorId: vendor.objectId,
+          vendorSlug: vendor.slug,
+          vendorName: vendor.name,
+          category: vendor.category,
+        };
+      }
+
+      if (b.vendorSlug === vendor.slug) {
+        return {
+          ...b,
+          vendorSlug: "",
+          vendorName: "Empty booth",
+          category: "default",
+        };
+      }
+
+      return b;
+    });
     setBooths(updated);
     onChange(updated);
     setAssigningTo(null);
@@ -185,6 +198,7 @@ export default function AdminMapEditor({
       b.boothId === boothId
         ? {
             ...b,
+            vendorId: "",
             vendorSlug: "",
             vendorName: "Empty booth",
             category: "default",
@@ -195,13 +209,13 @@ export default function AdminMapEditor({
     onChange(updated);
   };
 
-  const assignedSlugs = new Set(
-    booths.map((b) => b.vendorSlug).filter(Boolean)
+  const vendorAssignedBooth = new Map(
+    booths
+      .filter((b) => b.vendorSlug)
+      .map((b) => [b.vendorSlug, b.boothId])
   );
-  const availableVendors = vendors.filter(
-    (v) =>
-      !assignedSlugs.has(v.slug) &&
-      v.name.toLowerCase().includes(vendorSearch.toLowerCase())
+  const assignableVendors = vendors.filter((v) =>
+    v.name.toLowerCase().includes(vendorSearch.toLowerCase())
   );
 
   const selectedBooth = booths.find((b) => b.boothId === selected);
@@ -536,7 +550,7 @@ export default function AdminMapEditor({
                   ✕ Clear vendor
                 </div>
               )}
-              {availableVendors.length === 0 ? (
+              {assignableVendors.length === 0 ? (
                 <div
                   style={{
                     padding: "12px 14px",
@@ -545,12 +559,15 @@ export default function AdminMapEditor({
                     textAlign: "center",
                   }}
                 >
-                  {vendors.length === 0
-                    ? "No vendors loaded"
-                    : "All vendors assigned"}
+                  {vendors.length === 0 ? "No vendors loaded" : "No vendors match your search"}
                 </div>
               ) : (
-                availableVendors.map((v) => (
+                assignableVendors.map((v) => {
+                  const currentlyAssignedBooth = vendorAssignedBooth.get(v.slug);
+                  const isAssignedElsewhere =
+                    currentlyAssignedBooth && currentlyAssignedBooth !== assigningTo;
+
+                  return (
                   <div
                     key={v.slug}
                     onClick={() => assignVendor(assigningTo!, v)}
@@ -566,7 +583,7 @@ export default function AdminMapEditor({
                     onMouseLeave={(e) =>
                       (e.currentTarget.style.background = "white")
                     }
-                  >
+                    >
                     <div
                       style={{
                         fontSize: 12,
@@ -576,11 +593,21 @@ export default function AdminMapEditor({
                     >
                       {v.name}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: isAssignedElsewhere ? "#a45818" : "var(--text-muted)",
+                      }}
+                    >
                       {v.subcategory || v.category}
+                      {isAssignedElsewhere
+                        ? ` · currently at ${currentlyAssignedBooth}`
+                        : currentlyAssignedBooth
+                        ? " · currently here"
+                        : ""}
                     </div>
                   </div>
-                ))
+                )})
               )}
             </div>
           </div>

@@ -31,55 +31,15 @@ export default function LandingPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top left, rgba(179,208,188,0.22), transparent 24%), radial-gradient(circle at bottom right, rgba(202,155,85,0.18), transparent 18%), var(--cream)",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1240,
-          margin: "0 auto",
-          padding: "24px 24px 56px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 18,
-            marginBottom: 28,
-            flexWrap: "wrap",
-          }}
-        >
+    <div className="landing-root">
+      <div className="landing-shell">
+        <header className="landing-nav">
           <div>
-            <div
-              style={{
-                fontFamily: "Playfair Display, serif",
-                fontSize: 28,
-                color: "var(--forest)",
-                fontStyle: "italic",
-              }}
-            >
-              MarketFlow
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                letterSpacing: "1.6px",
-                textTransform: "uppercase",
-                color: "var(--text-muted)",
-                marginTop: 3,
-              }}
-            >
-              South Bend Farmers Market
-            </div>
+            <div className="landing-brand">MarketFlow</div>
+            <div className="landing-sub">South Bend Farmers Market</div>
           </div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div className="landing-auth">
             {user ? (
               <button className="btn btn-secondary" onClick={handleLogout}>
                 Log out
@@ -95,194 +55,98 @@ export default function LandingPage() {
               </>
             )}
           </div>
-        </div>
+        </header>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)",
-            gap: 24,
-            alignItems: "stretch",
-            marginBottom: 28,
-          }}
-        >
-          <section className="hero-panel" style={{ marginBottom: 0, minHeight: 440 }}>
-            <div style={{ alignSelf: "center" }}>
-              <div className="hero-eyebrow">Shop smarter before market day</div>
-              <h2 style={{ maxWidth: 640 }}>
-                Find your favorite vendors, preorder with confidence, and pick up without the guesswork.
-              </h2>
-              <div className="hero-copy" style={{ marginBottom: 22 }}>
-                MarketFlow helps customers plan their market trip like a real weekly ritual, with a cleaner way
-                to browse, order ahead, and track pickup details all in one place.
-              </div>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {user ? (
-                  <>
-                    <Link className="btn btn-primary" to="/">
-                      Open market map
-                    </Link>
-                    <button className="btn btn-secondary" onClick={handleLogout}>
-                      Log out
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link className="btn btn-primary" to="/signup">
-                      Start browsing
-                    </Link>
-                    <Link className="btn btn-secondary" to="/login">
-                      I already have an account
-                    </Link>
-                  </>
-                )}
-              </div>
+        <section className="landing-hero">
+          <div className="landing-hero-copy">
+            <div className="landing-kicker">Smart local shopping</div>
+            <h1>
+              Plan market day faster, place pre-orders confidently, and pick up without confusion.
+            </h1>
+            <p>
+              MarketFlow keeps vendors, menus, pickup windows, and order numbers in one clear flow so customers,
+              vendors, and market staff all stay in sync.
+            </p>
+            <div className="landing-cta">
+              {user ? (
+                <Link className="btn btn-primary" to="/">
+                  Open MarketFlow
+                </Link>
+              ) : (
+                <>
+                  <Link className="btn btn-primary" to="/signup">
+                    Get started
+                  </Link>
+                  <Link className="btn btn-secondary" to="/login">
+                    I already have an account
+                  </Link>
+                </>
+              )}
             </div>
+          </div>
 
-            <div className="hero-stat">
-              <div className="hero-stat-label">Built for market regulars</div>
-              <div className="hero-stat-value">Fresh, simple, local</div>
-              <div className="hero-stat-copy">
-                Skip the scramble. Keep track of vendors, order numbers, and pickup windows in one realistic flow.
+          <div className="landing-hero-panel">
+            <div className="landing-panel-title">Today at the market</div>
+            <div className="landing-order-chip">
+              <span>Order number</span>
+              <strong>ORD-842311</strong>
+            </div>
+            <div className="landing-panel-list">
+              <div>
+                <span>Vendor</span>
+                <strong>Fresh Fields Produce</strong>
               </div>
-            </div>
-          </section>
-
-          <section
-            style={{
-              borderRadius: 28,
-              padding: "28px 26px",
-              background: "rgba(255,255,255,0.78)",
-              border: "1px solid rgba(221, 207, 187, 0.95)",
-              boxShadow: "var(--shadow-md)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <div className="hero-eyebrow">What you can do</div>
-              <div
-                style={{
-                  fontFamily: "Playfair Display, serif",
-                  fontSize: 28,
-                  color: "var(--forest)",
-                  lineHeight: 1.1,
-                  marginBottom: 18,
-                }}
-              >
-                A smoother market morning.
+              <div>
+                <span>Pickup</span>
+                <strong>10:30 - 11:00 AM</strong>
               </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {featureCards.map((card) => (
-                <div
-                  key={card.title}
-                  style={{
-                    padding: "16px 16px 15px",
-                    borderRadius: 20,
-                    background: "rgba(248,244,236,0.88)",
-                    border: "1px solid rgba(221, 207, 187, 0.86)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: 12,
-                        background: "rgba(237,245,239,0.95)",
-                      }}
-                    >
-                      {card.icon}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: "var(--forest)",
-                      }}
-                    >
-                      {card.title}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 14, lineHeight: 1.55, color: "var(--text-secondary)" }}>
-                    {card.copy}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <section
-          style={{
-            borderRadius: 28,
-            padding: "26px 28px",
-            background: "rgba(255,255,255,0.72)",
-            border: "1px solid rgba(221, 207, 187, 0.95)",
-            boxShadow: "var(--shadow-sm)",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 18,
-            }}
-          >
-            <div>
-              <div className="hero-eyebrow">Customers</div>
-              <div style={promoTitleStyle}>Browse and order ahead</div>
-              <div style={promoCopyStyle}>
-                Search for vendors, view menus, and hold onto your pickup order number without digging through texts or notes.
-              </div>
-            </div>
-            <div>
-              <div className="hero-eyebrow">Vendors</div>
-              <div style={promoTitleStyle}>Keep inventory realistic</div>
-              <div style={promoCopyStyle}>
-                Update stock counts, manage orders, and keep your menu aligned with what you actually have on hand.
-              </div>
-            </div>
-            <div>
-              <div className="hero-eyebrow">Market teams</div>
-              <div style={promoTitleStyle}>Coordinate with less friction</div>
-              <div style={promoCopyStyle}>
-                Support smoother pickup experiences and better visibility into vendors, assignments, and reviews.
+              <div>
+                <span>Status</span>
+                <strong>Ready for pickup</strong>
               </div>
             </div>
           </div>
         </section>
 
-        <div
-          style={{
-            marginTop: 22,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 14,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-muted)", fontSize: 13.5 }}>
-            <IconStore size={14} color="var(--text-muted)" />
-            Built for a real market flow, not just a demo checkout.
+        <section className="landing-feature-grid">
+          {featureCards.map((card) => (
+            <article key={card.title} className="landing-feature-card">
+              <div className="landing-feature-head">
+                <div className="landing-feature-icon">{card.icon}</div>
+                <h3>{card.title}</h3>
+              </div>
+              <p>{card.copy}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="landing-audience-grid">
+          <article className="landing-audience-card">
+            <div className="landing-kicker">Customers</div>
+            <h3>Find what you want before you arrive</h3>
+            <p>Filter vendors, compare options, and keep your pickup details in one place.</p>
+          </article>
+          <article className="landing-audience-card">
+            <div className="landing-kicker">Vendors</div>
+            <h3>Manage inventory with fewer surprises</h3>
+            <p>Track stock, fulfill pickup orders, and keep your menu accurate through market close.</p>
+          </article>
+          <article className="landing-audience-card">
+            <div className="landing-kicker">Market staff</div>
+            <h3>Coordinate operations more clearly</h3>
+            <p>Monitor vendor activity and keep pickup flow organized across the whole floor.</p>
+          </article>
+        </section>
+
+        <footer className="landing-footer">
+          <div>
+            <IconStore size={14} color="var(--ink-muted)" /> Built for real market operations.
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div className="landing-footer-actions">
             {user ? (
-              <>
-                <Link className="btn btn-primary" to="/">
-                  Go to app
-                </Link>
-                <button className="btn btn-secondary" onClick={handleLogout}>
-                  Log out
-                </button>
-              </>
+              <Link className="btn btn-primary" to="/">
+                Go to dashboard
+              </Link>
             ) : (
               <>
                 <Link className="btn btn-secondary" to="/login">
@@ -294,21 +158,8 @@ export default function LandingPage() {
               </>
             )}
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   );
 }
-
-const promoTitleStyle: React.CSSProperties = {
-  fontFamily: "Playfair Display, serif",
-  fontSize: 24,
-  color: "var(--forest)",
-  marginBottom: 8,
-};
-
-const promoCopyStyle: React.CSSProperties = {
-  fontSize: 14.5,
-  color: "var(--text-secondary)",
-  lineHeight: 1.65,
-};

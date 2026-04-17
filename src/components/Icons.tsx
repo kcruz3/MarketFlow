@@ -156,9 +156,10 @@ export const IconZap = ({ size, color, style }: IconProps) => (
 
 export const IconUtensilsCrossed = ({ size, color, style }: IconProps) => (
   <svg {...d(size, color)} style={style}>
-    <path d="M16 2l6 6-6 6"/>
-    <path d="M8.93 6.34l-1.6 4.27-4.27-1.6L2 12l6 6 1.06-1.06-1.6-4.27 4.27-1.6L12 10z"/>
-    <line x1="2" y1="22" x2="22" y2="2"/>
+    <path d="M4 19h16" />
+    <path d="M6 16a6 6 0 0 1 12 0" />
+    <path d="M12 10V7" />
+    <circle cx="12" cy="12" r="1" />
   </svg>
 );
 

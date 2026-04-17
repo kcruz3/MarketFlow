@@ -4,6 +4,7 @@ import { IconLeaf, IconJar, IconUtensilsCrossed, IconMap } from "../Icons";
 
 export interface BoothPosition {
   vendorSlug: string;
+  vendorId?: string;
   vendorName: string;
   category: string;
   x: number;
@@ -341,6 +342,18 @@ export default function MarketMap({
 
         {/* Vendor popover panel */}
         {selected && (
+          (() => {
+            const linkCandidate =
+              (typeof selected.vendorSlug === "string"
+                ? selected.vendorSlug.trim()
+                : "") ||
+              (typeof selected.vendorId === "string"
+                ? selected.vendorId.trim()
+                : "");
+            const hasVendorLink =
+              linkCandidate.length > 0;
+
+            return (
           <div
             style={{
               position: "absolute",
@@ -395,23 +408,29 @@ export default function MarketMap({
                 : "Prepared Food"}
             </div>
             <button
-              onClick={() => navigate(`/vendors/${selected.vendorSlug}`)}
+              onClick={() =>
+                hasVendorLink &&
+                navigate(`/vendors/${encodeURIComponent(linkCandidate)}`)
+              }
               style={{
                 width: "100%",
                 padding: "8px",
                 borderRadius: 8,
                 border: "none",
-                background: "var(--green-mid)",
-                color: "white",
+                background: hasVendorLink ? "var(--green-mid)" : "var(--cream-dark)",
+                color: hasVendorLink ? "white" : "var(--text-muted)",
                 fontSize: 13,
                 fontWeight: 500,
-                cursor: "pointer",
+                cursor: hasVendorLink ? "pointer" : "not-allowed",
                 fontFamily: "DM Sans, sans-serif",
               }}
+              disabled={!hasVendorLink}
             >
-              View vendor →
+              {hasVendorLink ? "View vendor →" : "No vendor assigned"}
             </button>
           </div>
+            );
+          })()
         )}
       </div>
 

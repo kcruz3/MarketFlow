@@ -17,6 +17,23 @@ interface Props {
 }
 
 type Step = "details" | "vendors" | "booths";
+const STEP_ORDER: Step[] = ["details", "vendors", "booths"];
+const STEP_LABELS: Record<Step, string> = {
+  details: "Details",
+  vendors: "Vendors",
+  booths: "Booths",
+};
+const STEP_HELP: Record<Step, string> = {
+  details: "Set the event basics first.",
+  vendors: "Pick who is participating.",
+  booths: "Assign selected vendors to booths.",
+};
+const HOURS_PRESETS = [
+  "8:00 AM – 12:00 PM",
+  "9:00 AM – 1:00 PM",
+  "10:00 AM – 3:00 PM",
+  "11:00 AM – 4:00 PM",
+];
 
 export default function AddEventModal({
   onClose,
@@ -121,17 +138,28 @@ export default function AddEventModal({
     if (!hours.trim()) return "Market hours are required";
     return null;
   };
+  const endDateError =
+    date && endDate && endDate < date
+      ? "End date cannot be earlier than start date."
+      : null;
+  const detailError = validateDetails();
+  const canContinueDetails = !detailError && !endDateError;
+  const currentStepIndex = STEP_ORDER.indexOf(step);
 
   const handleNext = () => {
     if (step === "details") {
-      const err = validateDetails();
-      if (err) {
-        setError(err);
+      if (!canContinueDetails) {
+        setError(detailError || endDateError || "Please complete required fields.");
         return;
       }
       setError("");
       setStep("vendors");
     } else if (step === "vendors") {
+      if (selectedVendorSlugs.size === 0) {
+        setError("Select at least one vendor before assigning booths.");
+        return;
+      }
+      setError("");
       setStep("booths");
     }
   };
@@ -223,10 +251,10 @@ export default function AddEventModal({
 
         {/* Steps */}
         <div style={s.steps}>
-          {(["details", "vendors", "booths"] as Step[]).map((st, i) => {
-            const stepIndex = ["details", "vendors", "booths"].indexOf(step);
-            const isDone = i < stepIndex;
+          {STEP_ORDER.map((st, i) => {
+            const isDone = i < currentStepIndex;
             const isCurrent = step === st;
+            const canJump = i <= currentStepIndex;
             return (
               <div
                 key={st}
@@ -241,9 +269,9 @@ export default function AddEventModal({
                       ? "var(--forest-light)"
                       : "var(--cream-dark)",
                     color: isCurrent || isDone ? "white" : "var(--text-muted)",
-                    cursor: isDone ? "pointer" : "default",
+                    cursor: canJump ? "pointer" : "default",
                   }}
-                  onClick={() => isDone && setStep(st)}
+                  onClick={() => canJump && setStep(st)}
                 >
                   {isDone ? "✓" : i + 1}
                 </div>
@@ -253,11 +281,11 @@ export default function AddEventModal({
                     color: isCurrent ? "var(--forest)" : "var(--text-muted)",
                     fontWeight: isCurrent ? 500 : 400,
                     textTransform: "capitalize",
-                    cursor: isDone ? "pointer" : "default",
+                    cursor: canJump ? "pointer" : "default",
                   }}
-                  onClick={() => isDone && setStep(st)}
+                  onClick={() => canJump && setStep(st)}
                 >
-                  {st}
+                  {STEP_LABELS[st]}
                 </span>
                 {i < 2 && (
                   <span style={{ color: "var(--cream-dark)", margin: "0 4px" }}>
@@ -276,6 +304,12 @@ export default function AddEventModal({
           {/* Step 1: Details */}
           {step === "details" && (
             <div style={s.fields}>
+              <div style={s.stepCallout}>
+                <div style={s.stepCalloutTitle}>Step 1 of 3 · Event details</div>
+                <div style={s.stepCalloutText}>
+                  Name the event, choose date(s), and set the hours customers will see.
+                </div>
+              </div>
               <div style={s.field}>
                 <label style={s.label}>Event name *</label>
                 <input
@@ -284,6 +318,9 @@ export default function AddEventModal({
                   placeholder="e.g. Opening Day 2026"
                   style={s.input}
                 />
+                <div style={s.hint}>
+                  Use a short name your team and customers will recognize.
+                </div>
               </div>
               <div
                 style={{
@@ -300,6 +337,7 @@ export default function AddEventModal({
                     onChange={(e) => setDate(e.target.value)}
                     style={s.input}
                   />
+                  <div style={s.hint}>Start date for this market event.</div>
                 </div>
                 <div style={s.field}>
                   <label style={s.label}>
@@ -311,7 +349,25 @@ export default function AddEventModal({
                     onChange={(e) => setEndDate(e.target.value)}
                     style={s.input}
                   />
+                  <div style={s.hint}>Only needed for multi-day events.</div>
                 </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: -6 }}>
+                <button
+                  type="button"
+                  style={s.chipBtn}
+                  onClick={() => setEndDate(date)}
+                  disabled={!date}
+                >
+                  Set end date = start date
+                </button>
+                <button
+                  type="button"
+                  style={s.chipBtn}
+                  onClick={() => setEndDate("")}
+                >
+                  Clear end date
+                </button>
               </div>
               <div style={s.field}>
                 <label style={s.label}>Market hours *</label>
@@ -321,6 +377,23 @@ export default function AddEventModal({
                   placeholder="10:00 AM – 3:00 PM"
                   style={s.input}
                 />
+                <div style={s.hint}>Format: 10:00 AM - 3:00 PM</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                  {HOURS_PRESETS.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset}
+                      onClick={() => setHours(preset)}
+                      style={{
+                        ...s.chipBtn,
+                        borderColor: hours === preset ? "var(--forest-mid)" : "var(--cream-dark)",
+                        background: hours === preset ? "var(--sage-pale)" : "var(--white)",
+                      }}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div style={s.field}>
                 <label style={s.label}>
@@ -352,12 +425,19 @@ export default function AddEventModal({
                   Publish <span style={s.opt}>(visible to customers)</span>
                 </span>
               </label>
+              {endDateError && <div style={s.error}>{endDateError}</div>}
             </div>
           )}
 
           {/* Step 2: Vendors */}
           {step === "vendors" && (
             <div>
+              <div style={{ ...s.stepCallout, marginBottom: 14 }}>
+                <div style={s.stepCalloutTitle}>Step 2 of 3 · Vendor selection</div>
+                <div style={s.stepCalloutText}>
+                  Select every vendor participating in this event.
+                </div>
+              </div>
               {/* Toolbar */}
               <div
                 style={{
@@ -539,6 +619,12 @@ export default function AddEventModal({
           {/* Step 3: Booth map */}
           {step === "booths" && (
             <div>
+              <div style={{ ...s.stepCallout, marginBottom: 14 }}>
+                <div style={s.stepCalloutTitle}>Step 3 of 3 · Booth assignment</div>
+                <div style={s.stepCalloutText}>
+                  Assign only selected vendors to booth spaces, then save.
+                </div>
+              </div>
               <p
                 style={{
                   fontSize: 14,
@@ -560,9 +646,14 @@ export default function AddEventModal({
 
         {/* Footer */}
         <div style={s.footer}>
-          <button onClick={onClose} style={s.cancelBtn} disabled={saving}>
-            Cancel
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={onClose} style={s.cancelBtn} disabled={saving}>
+              Cancel
+            </button>
+            <div style={s.footerMeta}>
+              Step {currentStepIndex + 1} of 3 · {STEP_HELP[step]}
+            </div>
+          </div>
           <div style={{ display: "flex", gap: 10 }}>
             {step !== "details" && (
               <button
@@ -576,7 +667,11 @@ export default function AddEventModal({
               </button>
             )}
             {step !== "booths" ? (
-              <button onClick={handleNext} style={s.nextBtn}>
+              <button
+                onClick={handleNext}
+                style={s.nextBtn}
+                disabled={saving || (step === "details" && !canContinueDetails)}
+              >
                 Next →
               </button>
             ) : (
@@ -665,8 +760,25 @@ const s: Record<string, React.CSSProperties> = {
     marginBottom: 16,
   },
   fields: { display: "flex", flexDirection: "column", gap: 18 },
+  stepCallout: {
+    borderRadius: 10,
+    border: "1px solid var(--cream-dark)",
+    background: "var(--cream)",
+    padding: "10px 12px",
+  },
+  stepCalloutTitle: {
+    fontSize: 13,
+    color: "var(--forest)",
+    fontWeight: 700,
+    marginBottom: 3,
+  },
+  stepCalloutText: {
+    fontSize: 12.5,
+    color: "var(--text-secondary)",
+  },
   field: { display: "flex", flexDirection: "column", gap: 6 },
   label: { fontSize: 13, fontWeight: 500, color: "var(--text-primary)" },
+  hint: { fontSize: 12, color: "var(--text-muted)" },
   opt: { fontWeight: 400, color: "var(--text-muted)", fontSize: 12 },
   input: {
     padding: "9px 14px",
@@ -707,9 +819,15 @@ const s: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
     padding: "16px 28px",
     borderTop: "1px solid var(--cream-dark)",
     background: "var(--cream)",
+  },
+  footerMeta: {
+    fontSize: 12.5,
+    color: "var(--text-muted)",
   },
   cancelBtn: {
     padding: "9px 18px",

@@ -53,7 +53,15 @@ export function isUpcomingDate(value: DateValue, now: Date = new Date()) {
     return false;
   }
 
-  return new Date(value) >= now;
+  const eventDate = new Date(value);
+  const eventDay = new Date(
+    eventDate.getFullYear(),
+    eventDate.getMonth(),
+    eventDate.getDate()
+  );
+  const currentDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  return eventDay >= currentDay;
 }
 
 export function splitEventsByDate<T extends { date: DateValue }>(
