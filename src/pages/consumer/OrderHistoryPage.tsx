@@ -44,6 +44,7 @@ function OrderCard({ order }: { order: Order }) {
   const status = STATUS_STYLES[order.status];
   const date = new Date(order.createdAt);
   const isActive = !['fulfilled', 'cancelled'].includes(order.status);
+  const pickupCode = order.orderNumber || order.qrCode;
 
   return (
     <div style={{
@@ -77,6 +78,43 @@ function OrderCard({ order }: { order: Order }) {
             </span>
             <span>{(order.items as OrderItem[]).length} item{(order.items as OrderItem[]).length !== 1 ? 's' : ''}</span>
           </div>
+          {isActive && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 8,
+                padding: '8px 12px',
+                borderRadius: 10,
+                background: 'var(--green-pale)',
+                border: '1px solid var(--sage-light)',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                Order number
+              </span>
+              <span
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  letterSpacing: 1.5,
+                  color: 'var(--forest)',
+                }}
+              >
+                {pickupCode}
+              </span>
+            </div>
+          )}
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 19, color: 'var(--forest)' }}>
@@ -119,7 +157,7 @@ function OrderCard({ order }: { order: Order }) {
               <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, marginBottom: 10 }}>
                 Order number
               </div>
-              <OrderNumberDisplay code={order.orderNumber || order.qrCode} />
+              <OrderNumberDisplay code={pickupCode} />
             </div>
           )}
         </div>

@@ -16,7 +16,7 @@ export interface Order {
   customerEmail: string;
   vendorSlug: string;
   vendorName: string;
-  orderNumber: string;
+  orderNumber?: string;
   eventId?: string;
   items: OrderItem[];
   subtotal: number;
@@ -41,6 +41,48 @@ function mapCloudOrder(order: any): Order {
     ...order,
     createdAt: new Date(order.createdAt),
   } as Order;
+}
+
+async function createOrderClientSide(data: {
+  customerId: string;
+  customerEmail: string;
+  vendorSlug: string;
+  vendorName: string;
+  items: OrderItem[];
+  pickupWindow: string;
+  notes: string;
+  eventId?: string;
+}): Promise<Order> {
+  const subtotal = data.items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const qrCode = `MF-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+  const Obj = Parse.Object.extend('Order');
+  const obj = new Obj();
+  obj.set('customerId', data.customerId);
+  obj.set('customerEmail', data.customerEmail);
+  obj.set('vendorSlug', data.vendorSlug);
+  obj.set('vendorName', data.vendorName);
+  obj.set('items', data.items);
+  obj.set('subtotal', subtotal);
+  obj.set('total', subtotal);
+  obj.set('status', 'pending');
+  obj.set('pickupWindow', data.pickupWindow);
+  obj.set('notes', data.notes);
+  obj.set('qrCode', qrCode);
+  if (data.eventId) obj.set('eventId', data.eventId);
+
+  const acl = new Parse.ACL();
+  acl.setPublicReadAccess(false);
+  acl.setWriteAccess(data.customerId, false);
+  acl.setReadAccess(data.customerId, true);
+  acl.setRoleReadAccess('admin', true);
+  acl.setRoleWriteAccess('admin', true);
+  acl.setRoleReadAccess('vendor', true);
+  acl.setRoleWriteAccess('vendor', true);
+  obj.setACL(acl);
+
+  await obj.save();
+  return mapOrder(obj);
 }
 
 async function fetchOrdersByField(
@@ -102,8 +144,16 @@ export async function createOrder(data: {
   notes: string;
   eventId?: string;
 }): Promise<Order> {
-  const order = await Parse.Cloud.run('createOrderWithInventory', data);
-  return mapCloudOrder(order);
+  try {
+    const order = await Parse.Cloud.run('createOrderWithInventory', data);
+    return mapCloudOrder(order);
+  } catch (error: any) {
+    const message = String(error?.message || '');
+    if (/Invalid function/i.test(message)) {
+      return createOrderClientSide(data);
+    }
+    throw error;
+  }
 }
 
 // Vendor: fetch their own orders
