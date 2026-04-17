@@ -49,14 +49,15 @@ function OrderCard({ order }: { order: Order }) {
   return (
     <div style={{
       background: 'var(--white)',
-      borderRadius: 14,
-      border: `1px solid ${isActive ? 'var(--sage-light)' : 'var(--cream-dark)'}`,
+      borderRadius: 24,
+      border: `1px solid ${isActive ? 'rgba(179, 208, 188, 0.95)' : 'rgba(221, 207, 187, 0.95)'}`,
       overflow: 'hidden',
       transition: 'border-color 0.15s',
+      boxShadow: 'var(--shadow-sm)',
     }}>
       {/* Header */}
       <div
-        style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
+        style={{ padding: '20px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
         onClick={() => setExpanded(!expanded)}
       >
         <div style={{ flex: 1 }}>
@@ -65,8 +66,10 @@ function OrderCard({ order }: { order: Order }) {
               {order.vendorName}
             </span>
             <span style={{
-              fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
+              fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 999,
               background: status.bg, color: status.color,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
             }}>
               {status.label}
             </span>
@@ -85,10 +88,11 @@ function OrderCard({ order }: { order: Order }) {
                 alignItems: 'center',
                 gap: 8,
                 marginTop: 8,
-                padding: '8px 12px',
-                borderRadius: 10,
-                background: 'var(--green-pale)',
-                border: '1px solid var(--sage-light)',
+                padding: '10px 14px',
+                borderRadius: 16,
+                background: 'linear-gradient(180deg, rgba(237,245,239,0.95), rgba(255,255,255,0.98))',
+                border: '1px solid rgba(179, 208, 188, 0.95)',
+                boxShadow: 'var(--shadow-sm)',
               }}
             >
               <span
@@ -117,10 +121,10 @@ function OrderCard({ order }: { order: Order }) {
           )}
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 19, color: 'var(--forest)' }}>
+          <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 24, color: 'var(--forest)' }}>
             ${order.total.toFixed(2)}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>cash at pickup</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>cash at pickup</div>
         </div>
         <div style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 4 }}>
           {expanded ? '▲' : '▼'}
@@ -129,7 +133,7 @@ function OrderCard({ order }: { order: Order }) {
 
       {/* Expanded detail */}
       {expanded && (
-        <div style={{ borderTop: '1px solid var(--cream-mid)', padding: '16px 20px', display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ borderTop: '1px solid var(--cream-mid)', padding: '20px 24px 24px', display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           {/* Items */}
           <div style={{ flex: 1, minWidth: 200 }}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', fontWeight: 700, marginBottom: 10 }}>
@@ -186,9 +190,22 @@ export default function OrderHistoryPage() {
       </div>
 
       <div className="page-content">
-        <div className="page-header">
-          <h2>Order History</h2>
-          <p>Track your pre-orders and pickup order numbers</p>
+        <div className="hero-panel">
+          <div>
+            <div className="hero-eyebrow">Customer orders</div>
+            <h2>Your pickups, all in one place.</h2>
+            <div className="hero-copy">
+              Keep track of what you ordered, when to pick it up, and the order
+              number you’ll show at the booth.
+            </div>
+          </div>
+          <div className="hero-stat">
+            <div className="hero-stat-label">Ready to pick up</div>
+            <div className="hero-stat-value">{activeOrders.length}</div>
+            <div className="hero-stat-copy">
+              active order{activeOrders.length !== 1 ? "s" : ""} waiting for pickup or confirmation.
+            </div>
+          </div>
         </div>
 
         {/* Stats */}
@@ -210,16 +227,13 @@ export default function OrderHistoryPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '1px solid var(--cream-dark)' }}>
+        <div className="section-tabs">
           {(['active', 'past'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              padding: '10px 24px', borderRadius: '8px 8px 0 0', border: 'none',
-              borderBottom: tab === t ? '2px solid var(--forest-mid)' : '2px solid transparent',
-              background: tab === t ? 'var(--white)' : 'transparent',
-              color: tab === t ? 'var(--forest)' : 'var(--text-muted)',
-              fontWeight: tab === t ? 600 : 400, fontSize: 14,
-              cursor: 'pointer', fontFamily: 'Nunito, sans-serif', marginBottom: -1,
-            }}>
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`section-tab ${tab === t ? 'active' : ''}`}
+            >
               {t === 'active' ? `Active (${activeOrders.length})` : `Past (${pastOrders.length})`}
             </button>
           ))}

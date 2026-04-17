@@ -30,30 +30,34 @@ export default function VendorsPage() {
       </div>
 
       <div className="page-content">
-        <div className="page-header">
-          <h2>All Vendors</h2>
-          <p>Browse vendors at South Bend Farmers Market</p>
+        <div className="hero-panel">
+          <div>
+            <div className="hero-eyebrow">Browse the market</div>
+            <h2>Discover local vendors worth coming back for.</h2>
+            <div className="hero-copy">
+              Search by farm, product type, or location to quickly find the stands
+              you want to visit, preorder from, or save for later.
+            </div>
+          </div>
+          <div className="hero-stat">
+            <div className="hero-stat-label">Live directory</div>
+            <div className="hero-stat-value">{vendors.length}</div>
+            <div className="hero-stat-copy">
+              vendors currently listed across produce, pantry goods, and prepared food.
+            </div>
+          </div>
         </div>
 
-        {/* Search + filter */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="toolbar-panel">
           <input
             type="text"
-            placeholder="Search vendors..."
+            placeholder="Search vendors, locations, or specialties..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 20,
-              border: "1px solid var(--cream-dark)",
-              fontSize: 13,
-              outline: "none",
-              background: "var(--cream)",
-              fontFamily: "DM Sans, sans-serif",
-              minWidth: 200,
-            }}
+            className="modern-input"
+            style={{ minWidth: 260, flex: 1 }}
           />
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div className="filter-bar" style={{ marginBottom: 0 }}>
             {CATEGORIES.map((c) => (
               <button
                 key={c}
@@ -65,6 +69,25 @@ export default function VendorsPage() {
             ))}
           </div>
         </div>
+
+        {!loading && !error && filtered.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 18,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
+              Showing <strong style={{ color: "var(--forest)" }}>{filtered.length}</strong>{" "}
+              vendor{filtered.length !== 1 ? "s" : ""}
+              {category !== "All" ? ` in ${category}` : ""}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="loading-spinner">Loading vendors...</div>

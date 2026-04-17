@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "./styles.css";
 
 import { AuthProvider } from "./context/AuthContext";
+import { useAuthContext } from "./context/AuthContext";
 import Sidebar from "./components/Sidebar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -27,12 +28,15 @@ import VendorDashboard from "./pages/vendor/VendorDashboard";
 import VendorProfilePage from "./pages/vendor/VendorProfilePage";
 
 import OwnerUsersPage from "./pages/owner/OwnerUsersPage";
+import LandingPage from "./pages/public/LandingPage";
 
 function AppShell() {
+  const { user } = useAuthContext();
+
   return (
     <div className="app-shell">
-      <Sidebar />
-      <main className="main-content">
+      {user && <Sidebar />}
+      <main className="main-content" style={user ? undefined : { marginLeft: 0 }}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
@@ -40,11 +44,7 @@ function AppShell() {
 
           <Route
             path="/"
-            element={
-              <ProtectedRoute>
-                <MapPage />
-              </ProtectedRoute>
-            }
+            element={user ? <MapPage /> : <LandingPage />}
           />
           <Route
             path="/vendors"

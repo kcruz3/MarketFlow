@@ -74,7 +74,7 @@ a {
   text-decoration: none;
 }
 button {
-  font-family: "Nunito", sans-serif;
+  font-family: "DM Sans", sans-serif;
   cursor: pointer;
   border: none;
   outline: none;
@@ -181,7 +181,7 @@ button {
   letter-spacing: 2.2px;
   display: block;
   margin-top: 4px;
-  font-family: "Nunito", sans-serif;
+  font-family: "DM Sans", sans-serif;
   font-weight: 400;
 }
 
@@ -196,7 +196,7 @@ button {
   color: rgba(255, 255, 255, 0.2);
   padding: 0 10px;
   margin-bottom: 5px;
-  font-family: "Nunito", sans-serif;
+  font-family: "DM Sans", sans-serif;
   font-weight: 600;
 }
 
@@ -316,7 +316,7 @@ button {
   font-size: 13.5px;
   color: var(--text-primary);
   width: 100%;
-  font-family: "Nunito", sans-serif;
+  font-family: "DM Sans", sans-serif;
 }
 
 .topbar-search input::placeholder {
@@ -645,7 +645,7 @@ tbody td {
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s;
-  font-family: "Nunito", sans-serif;
+  font-family: "DM Sans", sans-serif;
   font-weight: 600;
   box-shadow: var(--shadow-sm);
 }
@@ -877,7 +877,7 @@ tbody td {
   border: 1px solid rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.45);
   font-size: 13.5px;
-  font-family: "Nunito", sans-serif;
+  font-family: "DM Sans", sans-serif;
   cursor: pointer;
   transition: all 0.15s;
   margin-top: 8px;
@@ -892,6 +892,130 @@ tbody td {
   background: rgba(200, 60, 60, 0.1);
   border-color: rgba(200, 60, 60, 0.18);
   color: #f09090;
+}
+
+.hero-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.85fr);
+  gap: 24px;
+  padding: 30px 32px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(202, 155, 85, 0.15), transparent 30%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(237, 245, 239, 0.98));
+  border: 1px solid rgba(179, 208, 188, 0.78);
+  box-shadow: var(--shadow-md);
+  margin-bottom: 28px;
+}
+
+.hero-panel h2 {
+  font-size: 40px;
+  line-height: 1.02;
+  margin-bottom: 10px;
+  color: var(--forest);
+}
+
+.hero-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.hero-copy {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 620px;
+}
+
+.hero-stat {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 22px 24px;
+  border-radius: 24px;
+  background: rgba(19, 39, 29, 0.97);
+  color: white;
+}
+
+.hero-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.3px;
+  color: rgba(255, 255, 255, 0.56);
+  margin-bottom: 10px;
+}
+
+.hero-stat-value {
+  font-family: "Playfair Display", serif;
+  font-size: 34px;
+  color: var(--wheat-light);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.hero-stat-copy {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
+}
+
+.toolbar-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(221, 207, 187, 0.92);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 24px;
+}
+
+.modern-input {
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(221, 207, 187, 0.95);
+  font-size: 14px;
+  outline: none;
+  background: rgba(248, 244, 236, 0.82);
+  font-family: "DM Sans", sans-serif;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.modern-input::placeholder {
+  color: var(--text-muted);
+}
+
+.section-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.section-tab {
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(221, 207, 187, 0.95);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.section-tab.active {
+  background: linear-gradient(180deg, #295f44, var(--forest-mid));
+  color: white;
+  border-color: var(--forest-mid);
 }
 
 .logout-btn svg {
@@ -1007,6 +1131,24 @@ tbody td {
 
   .page-content {
     padding: 20px 16px;
+  }
+
+  .hero-panel {
+    grid-template-columns: 1fr;
+    padding: 24px 22px;
+  }
+
+  .hero-panel h2 {
+    font-size: 32px;
+  }
+
+  .toolbar-panel {
+    padding: 16px;
+  }
+
+  .topbar-search {
+    width: 100%;
+    max-width: 320px;
   }
 }
 

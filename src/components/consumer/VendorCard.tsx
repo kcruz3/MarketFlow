@@ -38,8 +38,34 @@ export default function VendorCard({ vendor }: { vendor: Vendor }) {
         )}
       </div>
       <div className="vendor-card-body">
-        <div className="vendor-card-name">{vendor.name}</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 8,
+          }}
+        >
+          <div className="vendor-card-name" style={{ marginBottom: 0 }}>
+            {vendor.name}
+          </div>
+          {vendor.acceptsPreOrder && (
+            <span
+              className="badge badge-amber"
+              style={{ whiteSpace: "nowrap", marginTop: 2 }}
+            >
+              Pre-order
+            </span>
+          )}
+        </div>
         <div className="vendor-card-desc">{vendor.description}</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+          <span className="badge badge-gray">{vendor.subcategory || vendor.category}</span>
+          {vendor.isOrganic && (
+            <span className="badge badge-green">Organic</span>
+          )}
+        </div>
         <div className="vendor-card-meta">
           <span
             className="vendor-card-location"
@@ -48,19 +74,11 @@ export default function VendorCard({ vendor }: { vendor: Vendor }) {
             <IconPin size={12} color="var(--text-muted)" />
             {vendor.location}
           </span>
-          <div style={{ display: "flex", gap: 6 }}>
-            {vendor.isOrganic && (
-              <span className="badge badge-green">Organic</span>
-            )}
-            {vendor.acceptsPreOrder && (
-              <span
-                className="badge badge-amber"
-                style={{ display: "flex", alignItems: "center", gap: 3 }}
-              >
-                <IconZap size={10} color="var(--wheat)" />
-                Pre-order
-              </span>
-            )}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--text-muted)" }}>
+            {vendor.acceptsPreOrder && <IconZap size={12} color="var(--wheat)" />}
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--forest-mid)" }}>
+              View shop
+            </span>
           </div>
         </div>
       </div>
