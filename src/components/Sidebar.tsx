@@ -67,7 +67,15 @@ const ownerLinks = [
   },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  desktopOpen: boolean;
+  onToggleDesktop: () => void;
+}
+
+export default function Sidebar({
+  desktopOpen,
+  onToggleDesktop,
+}: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthContext();
@@ -269,7 +277,30 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="sidebar sidebar-desktop">
+      <aside
+        className={`sidebar sidebar-desktop ${
+          desktopOpen ? "sidebar-desktop-open" : "sidebar-desktop-closed"
+        }`}
+      >
+        <button
+          className="sidebar-desktop-collapse"
+          onClick={onToggleDesktop}
+          aria-label={desktopOpen ? "Close sidebar" : "Open sidebar"}
+          type="button"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
         <SidebarContent />
       </aside>
 

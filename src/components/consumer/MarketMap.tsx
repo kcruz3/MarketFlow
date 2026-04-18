@@ -54,6 +54,8 @@ export default function MarketMap({
 }: Props) {
   const [selected, setSelected] = useState<BoothPosition | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Close panel on outside click
@@ -67,72 +69,98 @@ export default function MarketMap({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement && containerRef.current) {
+        await containerRef.current.requestFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Ignore browser fullscreen failures and leave the current mode intact.
+    }
+  };
+
   const PADDING = 40;
   const AISLE_W = 24;
   const ENTRANCE_Y = height - 40;
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div
+      ref={containerRef}
+      className={`market-map-shell ${isFullscreen ? "is-fullscreen" : ""}`}
+      style={{ position: "relative", width: "100%" }}
+    >
       {/* Legend */}
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          flexWrap: "wrap",
-          marginBottom: 12,
-          fontSize: 12,
-          color: "var(--text-secondary)",
-        }}
-      >
-        {Object.entries(CATEGORY_COLORS)
-          .filter(([k]) => k !== "default")
-          .map(([cat, col]) => (
-            <div
-              key={cat}
-              style={{ display: "flex", alignItems: "center", gap: 5 }}
-            >
+      <div className="market-map-toolbar">
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            flexWrap: "wrap",
+            fontSize: 12,
+            color: "var(--text-secondary)",
+          }}
+        >
+          {Object.entries(CATEGORY_COLORS)
+            .filter(([k]) => k !== "default")
+            .map(([cat, col]) => (
               <div
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 3,
-                  background: col.fill,
-                  border: `1.5px solid ${col.stroke}`,
-                }}
-              />
-              <span>
-                {cat === "Farmers, Fishers, Foragers"
-                  ? "Farmers"
-                  : cat === "Food & Beverage Producers"
-                  ? "Producers"
-                  : "Prepared Food"}
-              </span>
-            </div>
-          ))}
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <div
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: 3,
-              background: "#e1f5ee",
-              border: "1.5px solid #1D9E75",
-            }}
-          />
-          <span>Selected</span>
+                key={cat}
+                style={{ display: "flex", alignItems: "center", gap: 5 }}
+              >
+                <div
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 3,
+                    background: col.fill,
+                    border: `1.5px solid ${col.stroke}`,
+                  }}
+                />
+                <span>
+                  {cat === "Farmers, Fishers, Foragers"
+                    ? "Farmers"
+                    : cat === "Food & Beverage Producers"
+                    ? "Producers"
+                    : "Prepared Food"}
+                </span>
+              </div>
+            ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 3,
+                background: "#e1f5ee",
+                border: "1.5px solid #1D9E75",
+              }}
+            />
+            <span>Selected</span>
+          </div>
         </div>
+        <button
+          className="market-map-fullscreen-btn"
+          onClick={toggleFullscreen}
+          type="button"
+        >
+          {isFullscreen ? "Exit full screen" : "Full screen"}
+        </button>
       </div>
 
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          overflow: "auto",
-          borderRadius: 12,
-          border: "1px solid var(--cream-dark)",
-          background: "#f9f6f0",
-        }}
-      >
+      <div className={`market-map-frame ${isFullscreen ? "is-fullscreen" : ""}`}>
         <svg
           ref={svgRef}
           width={width}

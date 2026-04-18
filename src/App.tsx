@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "./styles.css";
 
@@ -32,11 +32,35 @@ import LandingPage from "./pages/public/LandingPage";
 
 function AppShell() {
   const { user } = useAuthContext();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <div className="app-shell">
-      {user && <Sidebar />}
-      <main className="main-content" style={user ? undefined : { marginLeft: 0 }}>
+      {user && (
+        <>
+          <Sidebar
+            desktopOpen={sidebarOpen}
+            onToggleDesktop={() => setSidebarOpen((current) => !current)}
+          />
+          <button
+            className={`sidebar-desktop-toggle ${
+              sidebarOpen ? "is-open" : "is-closed"
+            }`}
+            onClick={() => setSidebarOpen((current) => !current)}
+            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+            aria-pressed={sidebarOpen}
+            type="button"
+          >
+            <span className="hamburger-line" />
+            <span className="hamburger-line" />
+            <span className="hamburger-line" />
+          </button>
+        </>
+      )}
+      <main
+        className={`main-content ${user && !sidebarOpen ? "sidebar-collapsed" : ""}`}
+        style={user ? undefined : { marginLeft: 0 }}
+      >
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
