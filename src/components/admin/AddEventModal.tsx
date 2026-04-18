@@ -42,6 +42,21 @@ export default function AddEventModal({
 }: Props) {
   const { vendors } = useVendors();
   const isEditing = !!editEvent;
+  const mapDraftStorageKey = `marketflow:booth-map-draft:${
+    editEvent?.objectId ?? "new-event"
+  }`;
+
+  const readBoothMapDraft = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(mapDraftStorageKey);
+      if (!raw) return null;
+      return parseBoothMap(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  };
+
   const [step, setStep] = useState<Step>("details");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -61,14 +76,14 @@ export default function AddEventModal({
   const [vendorSearch, setVendorSearch] = useState("");
   const [vendorCategoryFilter, setVendorCategoryFilter] = useState("All");
   const [boothMap, setBoothMap] = useState<BoothPosition[]>(
-    parseBoothMap(editEvent?.boothMap)
+    () => readBoothMapDraft() ?? parseBoothMap(editEvent?.boothMap)
   );
 
   // Load existing vendor relations when editing
   useEffect(() => {
     if (!editEvent) return;
-    // Re-parse boothMap from the live event in case it updated
-    setBoothMap(parseBoothMap(editEvent.boothMap));
+    // Re-parse boothMap from the live event in case it updated; prefer draft if available.
+    setBoothMap(readBoothMapDraft() ?? parseBoothMap(editEvent.boothMap));
     const loadVendors = async () => {
       try {
         const query = new Parse.Query("MarketEvent");
@@ -82,6 +97,15 @@ export default function AddEventModal({
     };
     loadVendors();
   }, [editEvent]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(mapDraftStorageKey, JSON.stringify(boothMap));
+    } catch {
+      // Ignore localStorage failures; map editing should still continue.
+    }
+  }, [boothMap, mapDraftStorageKey]);
 
   const VENDOR_CATEGORIES = [
     "All",
@@ -173,6 +197,9 @@ export default function AddEventModal({
       const obj = await q.get(editEvent.objectId);
       obj.set("boothMap", serializeBoothMap(boothMap));
       await obj.save();
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(mapDraftStorageKey);
+      }
       onSaved();
     } catch (e: any) {
       setError(e.message || "Failed to save map");
@@ -222,6 +249,9 @@ export default function AddEventModal({
       }
 
       await obj.save();
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(mapDraftStorageKey);
+      }
       onSaved();
     } catch (e: any) {
       setError(e.message || "Failed to save event");
