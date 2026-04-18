@@ -161,6 +161,7 @@ export default function MarketMap({
       </div>
 
       <div className={`market-map-frame ${isFullscreen ? "is-fullscreen" : ""}`}>
+        <div className="market-map-canvas">
         <svg
           ref={svgRef}
           width={width}
@@ -367,6 +368,7 @@ export default function MarketMap({
             );
           })}
         </svg>
+        </div>
 
         {/* Vendor popover panel */}
         {selected && (

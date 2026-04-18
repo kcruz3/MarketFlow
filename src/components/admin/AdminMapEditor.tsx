@@ -29,6 +29,7 @@ export default function AdminMapEditor({
   width = CANVAS_W,
   height = CANVAS_H,
 }: Props) {
+  const shellRef = useRef<HTMLDivElement>(null);
   const [booths, setBooths] = useState<BoothPosition[]>(() =>
     parseBoothMap(initialBooths)
   );
@@ -47,6 +48,7 @@ export default function AdminMapEditor({
   } | null>(null);
   const [assigningTo, setAssigningTo] = useState<string | null>(null);
   const [vendorSearch, setVendorSearch] = useState("");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const startRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -54,6 +56,29 @@ export default function AdminMapEditor({
     const parsed = parseBoothMap(initialBooths);
     if (parsed.length) setBooths(parsed);
   }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === shellRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement && shellRef.current) {
+        await shellRef.current.requestFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen API errors and keep current editor mode.
+    }
+  };
 
   const getSVGPoint = (e: React.MouseEvent) => {
     const rect = svgRef.current!.getBoundingClientRect();
@@ -237,7 +262,11 @@ export default function AdminMapEditor({
     };
 
   return (
-    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+    <div
+      ref={shellRef}
+      className={`admin-map-shell ${isFullscreen ? "is-fullscreen" : ""}`}
+      style={{ display: "flex", gap: 16, alignItems: "flex-start" }}
+    >
       {/* Canvas */}
       <div style={{ flex: 1 }}>
         {/* Toolbar */}
@@ -294,6 +323,22 @@ export default function AdminMapEditor({
             {booths.length} booths · {booths.filter((b) => b.vendorSlug).length}{" "}
             assigned
           </span>
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              marginLeft: "auto",
+              padding: "6px 12px",
+              borderRadius: 8,
+              border: "1px solid var(--cream-dark)",
+              background: "var(--white)",
+              color: "var(--text-secondary)",
+              fontSize: 12,
+              cursor: "pointer",
+              fontFamily: "DM Sans, sans-serif",
+            }}
+          >
+            {isFullscreen ? "Exit full screen" : "Full screen"}
+          </button>
           {booths.length > 0 && (
             <button
               onClick={() => {
@@ -301,7 +346,6 @@ export default function AdminMapEditor({
                 onChange([]);
               }}
               style={{
-                marginLeft: "auto",
                 padding: "6px 12px",
                 borderRadius: 8,
                 border: "1px solid #ffcdd2",
@@ -320,18 +364,20 @@ export default function AdminMapEditor({
         <div
           style={{
             borderRadius: 12,
-            overflow: "hidden",
+            overflow: "auto",
             border: "1px solid var(--cream-dark)",
             background: "#f9f6f0",
             cursor: tool === "draw" ? "crosshair" : "default",
+            maxHeight: isFullscreen ? "calc(100vh - 180px)" : undefined,
           }}
         >
+          <div style={{ minWidth: "100%", display: "flex", justifyContent: "center" }}>
           <svg
             ref={svgRef}
             width={width}
             height={height}
             viewBox={`0 0 ${width} ${height}`}
-            style={{ display: "block", userSelect: "none" }}
+            style={{ display: "block", userSelect: "none", minWidth: width }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -462,6 +508,7 @@ export default function AdminMapEditor({
               />
             )}
           </svg>
+          </div>
         </div>
 
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
@@ -472,7 +519,7 @@ export default function AdminMapEditor({
       </div>
 
       {/* Side panel */}
-      <div style={{ width: 220, flexShrink: 0 }}>
+      <div style={{ width: isFullscreen ? 260 : 220, flexShrink: 0 }}>
         {assigningTo ? (
           <div
             style={{

@@ -5,6 +5,7 @@ import { useMarketEvents } from "../../hooks/useMarketEvents";
 import MarketMap, { BoothPosition } from "../../components/consumer/MarketMap";
 import Parse from "../../lib/parse";
 import {
+  formatEventDate,
   isUpcomingDate,
   splitEventsByDate,
   sortEventsByDateAsc,
@@ -187,14 +188,12 @@ export default function MapPage() {
                 <span>{selectedEvent.address}</span>
               </div>
             </div>
-            <div style={s.heroBannerDate}>
+              <div style={s.heroBannerDate}>
               <div style={s.heroBannerDay}>
-                {new Date(selectedEvent.date).getDate()}
+                {formatEventDate(selectedEvent.date, { day: "numeric" })}
               </div>
               <div style={s.heroBannerMonth}>
-                {new Date(selectedEvent.date).toLocaleString("default", {
-                  month: "long",
-                })}
+                {formatEventDate(selectedEvent.date, { month: "long" })}
               </div>
             </div>
           </div>
@@ -208,7 +207,6 @@ export default function MapPage() {
             </div>
             <div style={s.eventCards}>
               {publishedEvents.map((event, i) => {
-                const date = new Date(event.date);
                 return (
                   <div
                     key={event.objectId}
@@ -226,13 +224,15 @@ export default function MapPage() {
                       <div style={s.nextBadge}>Next market</div>
                     )}
                     <div style={s.eventCardDate}>
-                      <div style={s.eventDay}>{date.getDate()}</div>
-                      <div style={s.eventMonth}>
-                        {date
-                          .toLocaleString("default", { month: "short" })
-                          .toUpperCase()}
+                      <div style={s.eventDay}>
+                        {formatEventDate(event.date, { day: "numeric" })}
                       </div>
-                      <div style={s.eventYear}>{date.getFullYear()}</div>
+                      <div style={s.eventMonth}>
+                        {formatEventDate(event.date, { month: "short" }).toUpperCase()}
+                      </div>
+                      <div style={s.eventYear}>
+                        {formatEventDate(event.date, { year: "numeric" })}
+                      </div>
                     </div>
                     <div style={s.eventCardInfo}>
                       <div style={s.eventName}>{event.name}</div>
@@ -376,7 +376,7 @@ export default function MapPage() {
                         }}
                       >
                         <div style={s.allEventsDate}>
-                          {new Date(event.date).toLocaleDateString("en-US", {
+                          {formatEventDate(event.date, {
                             month: "short",
                             day: "numeric",
                             year: "numeric",
@@ -407,7 +407,7 @@ export default function MapPage() {
                     {pastPublishedEvents.map((event) => (
                       <div key={event.objectId} style={s.pastEventsRow}>
                         <div style={s.allEventsDate}>
-                          {new Date(event.date).toLocaleDateString("en-US", {
+                          {formatEventDate(event.date, {
                             month: "short",
                             day: "numeric",
                             year: "numeric",

@@ -3,6 +3,7 @@ import { useAuthContext } from "../../context/AuthContext";
 import { useVendorOrders, OrderStatus, OrderItem } from "../../hooks/useOrders";
 import { useMenuItems } from "../../hooks/useMenuItems";
 import { useMarketEvents } from "../../hooks/useMarketEvents";
+import { formatEventDate, isUpcomingDate } from "../../lib/marketEvents";
 import {
   IconShoppingCart,
   IconTrash,
@@ -697,8 +698,12 @@ export default function VendorDashboard() {
                   booth: ev.boothMap.find(b => b.vendorSlug === vendorSlug)!,
                 }));
               const now = new Date();
-              const upcoming = vendorEvents.filter(({ event }) => new Date(event.date) >= now);
-              const past = vendorEvents.filter(({ event }) => new Date(event.date) < now);
+              const upcoming = vendorEvents.filter(({ event }) =>
+                isUpcomingDate(event.date, now)
+              );
+              const past = vendorEvents.filter(
+                ({ event }) => !isUpcomingDate(event.date, now)
+              );
 
               if (vendorEvents.length === 0) {
                 return (
@@ -713,8 +718,7 @@ export default function VendorDashboard() {
               }
 
               const renderEventRow = ({ event, booth }: { event: typeof events[0]; booth: { boothId: string } }) => {
-                const date = new Date(event.date);
-                const isUpcoming = date >= now;
+                const isUpcoming = isUpcomingDate(event.date, now);
                 return (
                   <div className="card" key={event.objectId} style={{ marginBottom: 12 }}>
                     <div className="card-body" style={{ padding: "16px 20px" }}>
@@ -730,7 +734,12 @@ export default function VendorDashboard() {
                           </div>
                           <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4 }}>
                             <IconCalendar size={12} color="var(--text-muted)" style={{ marginRight: 5, verticalAlign: "middle" }} />
-                            {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                            {formatEventDate(event.date, {
+                              weekday: "long",
+                              month: "long",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
                             {event.hours && <span style={{ marginLeft: 10, color: "var(--text-muted)" }}>{event.hours}</span>}
                           </div>
                           {event.address && (

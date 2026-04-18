@@ -1,6 +1,7 @@
 import React from "react";
 import { MarketEvent } from "../../hooks/useMarketEvents";
 import { IconCalendar, IconEdit, IconClock, IconPin } from "../Icons";
+import { formatEventDate } from "../../lib/marketEvents";
 
 interface Props {
   events: MarketEvent[];
@@ -23,13 +24,14 @@ export default function EventList({ events, onEdit }: Props) {
   return (
     <div>
       {events.map((event) => {
-        const date = new Date(event.date);
         return (
           <div className="event-item" key={event.objectId}>
             <div className="event-date-block">
-              <div className="event-date-day">{date.getDate()}</div>
+              <div className="event-date-day">
+                {formatEventDate(event.date, { day: "numeric" })}
+              </div>
               <div className="event-date-month">
-                {date.toLocaleString("default", { month: "short" })}
+                {formatEventDate(event.date, { month: "short" })}
               </div>
             </div>
             <div className="event-info" style={{ flex: 1 }}>

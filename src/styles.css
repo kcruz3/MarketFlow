@@ -418,9 +418,23 @@ button {
   background: #f9f6f0;
 }
 
+.market-map-canvas {
+  min-width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .market-map-frame.is-fullscreen {
   height: calc(100vh - 96px);
   max-height: calc(100vh - 96px);
+}
+
+.admin-map-shell.is-fullscreen {
+  background:
+    radial-gradient(circle at top right, rgba(193, 139, 65, 0.1), transparent 30%),
+    #f6f1e8;
+  padding: 20px;
+  min-height: 100vh;
 }
 
 .page-header {
@@ -1548,6 +1562,10 @@ tbody td {
   .market-map-fullscreen-btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .admin-map-shell {
+    flex-direction: column;
   }
 
   .card-header {

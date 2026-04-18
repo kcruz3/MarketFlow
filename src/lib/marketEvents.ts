@@ -2,6 +2,36 @@ import { BoothPosition } from "../components/consumer/MarketMap";
 
 type DateValue = Date | string | number | null | undefined;
 
+function toValidDate(value: DateValue): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function getUtcDateParts(value: DateValue): {
+  year: number;
+  month: number;
+  day: number;
+} | null {
+  const date = toValidDate(value);
+  if (!date) {
+    return null;
+  }
+
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+  };
+}
+
 function isBoothPosition(value: unknown): value is BoothPosition {
   return (
     value !== null &&
@@ -40,28 +70,42 @@ export function serializeBoothMap(
 }
 
 export function toDateInputValue(value: DateValue): string {
-  if (!value) {
+  const parts = getUtcDateParts(value);
+  if (!parts) {
     return "";
   }
 
-  const date = value instanceof Date ? value : new Date(value);
-  return date.toISOString().split("T")[0];
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+}
+
+export function formatEventDate(
+  value: DateValue,
+  options: Intl.DateTimeFormatOptions,
+  locale: string = "en-US"
+): string {
+  const date = toValidDate(value);
+  if (!date) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(
+    date
+  );
 }
 
 export function isUpcomingDate(value: DateValue, now: Date = new Date()) {
-  if (!value) {
+  const eventParts = getUtcDateParts(value);
+  if (!eventParts) {
     return false;
   }
 
-  const eventDate = new Date(value);
-  const eventDay = new Date(
-    eventDate.getFullYear(),
-    eventDate.getMonth(),
-    eventDate.getDate()
-  );
-  const currentDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentDay = now.getDate();
+  const eventKey = eventParts.year * 10000 + eventParts.month * 100 + eventParts.day;
+  const currentKey = currentYear * 10000 + currentMonth * 100 + currentDay;
 
-  return eventDay >= currentDay;
+  return eventKey >= currentKey;
 }
 
 export function splitEventsByDate<T extends { date: DateValue }>(
