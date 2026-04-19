@@ -1,8 +1,48 @@
 # MarketFlow
 
-Admin and consumer platform for the South Bend Farmers Market.
+Role-based web platform for the South Bend Farmers Market.  
+MarketFlow supports customers, vendors, admins, and owners with event planning, booth mapping, ordering, reviews, and user management.
 
 **Group:** Kathryn Cruz, Dan Huss, Christian Dunne
+
+## What The App Does
+
+### Customer experience
+
+- Browse upcoming market events and a visual market map
+- View vendor profiles, tags, menus, and reviews
+- Place pre-orders with inventory-aware checkout
+- Track order history and status
+- Manage personal profile details
+
+### Vendor experience
+
+- Access vendor dashboard tabs for orders, menu, earnings, and events
+- Manage menu items and inventory counts
+- View assigned booth/event schedule
+- Edit vendor profile and business details
+
+### Admin experience
+
+- Create and edit market events
+- Build booth layouts with the advanced map editor:
+  - draw/select modes
+  - multi-select and box-select
+  - drag, resize handles, duplicate, rotate
+  - quick vendor assignment (`/` shortcut)
+  - overlap warnings
+  - undo/redo
+  - zoom/fit/full-screen and mini navigator
+  - local draft autosave while editing
+- Manage vendors and vendor-to-user linking
+- Review and process vendor applications
+- Moderate reviews
+- View analytics dashboard
+
+### Owner experience
+
+- Manage all users and roles
+- Delete users (with protections for owner account safety)
 
 ## Prerequisites
 
@@ -55,21 +95,28 @@ The app will open at [http://localhost:3000](http://localhost:3000).
 ## Project Structure
 
 ```
+cloud/
+└── main.js           # Parse Cloud Functions
+
 src/
 ├── components/
-│   ├── admin/        # Admin-only components (event modal, vendor table, map editor)
-│   ├── consumer/     # Consumer-facing components (market map, vendor cards)
+│   ├── admin/        # Admin tools (event modal, vendor table, advanced map editor)
+│   ├── consumer/     # Customer components (market map, checkout, reviews)
 │   └── Icons.tsx     # Shared icon components
 ├── context/
 │   └── AuthContext.tsx
-├── hooks/            # Data fetching hooks (useAuth, useVendors, useMarketEvents, etc.)
+├── hooks/            # Parse-backed data hooks
 ├── lib/
-│   └── parse.ts      # Parse/Back4App initialization
+│   ├── parse.ts      # Parse/Back4App initialization
+│   └── marketEvents.ts
 ├── pages/
-│   ├── admin/        # Admin pages (events, vendors, approvals, analytics)
+│   ├── admin/        # Admin pages (events, vendors, approvals, analytics, reviews)
 │   ├── auth/         # Login and signup pages
-│   ├── consumer/     # Consumer pages (market map, vendor directory)
-│   └── owner/        # Owner pages (user management)
+│   ├── consumer/     # Map, vendors, vendor detail, order history
+│   ├── vendor/       # Vendor dashboard/profile/apply
+│   ├── owner/        # Owner user management
+│   ├── account/      # Profile page
+│   └── public/       # Welcome/landing page
 ├── App.tsx           # Routes
 └── styles.css        # Global styles
 ```
@@ -78,14 +125,22 @@ src/
 
 | Role | Access |
 |---|---|
-| `owner` | Full access including user management |
-| `admin` | Manage events, vendors, and approvals |
-| `customer` | Browse market, view vendors and events |
-| `vendor` | Reserved role — vendor self-service UI coming in a future sprint |
+| `owner` | Owner-only user management + inherited admin access |
+| `admin` | Manage events, booth maps, vendors, applications, analytics, reviews |
+| `vendor` | Vendor dashboard, menu/inventory management, profile management, assignments |
+| `customer` | Browse events/vendors, place orders, leave reviews, manage profile |
 
 Roles are managed in Back4App under the `Role` class.
 
-## Back4App Setup
+## Routes (High-Level)
+
+- Public/Auth: `/welcome`, `/login`, `/signup`, `/vendor/apply`
+- Customer: `/`, `/vendors`, `/vendors/:slug`, `/orders`, `/profile`
+- Vendor: `/vendor/dashboard`, `/vendor/profile`
+- Admin: `/admin`, `/admin/vendors`, `/admin/events`, `/admin/applications`, `/admin/analytics`, `/admin/reviews`
+- Owner: `/owner/users`
+
+## Parse Data Model
 
 The app uses the following Parse classes:
 
@@ -97,11 +152,24 @@ The app uses the following Parse classes:
 
 Make sure Public Read access is enabled on `Vendor` and `MarketEvent` for unauthenticated browsing.
 
-## Cloud Code
+## Cloud Functions (`cloud/main.js`)
 
-Admin review deletion now uses a Parse Cloud Function in [cloud/main.js](/Users/kathryncruz/Desktop/MarketFlow/cloud/main.js) named `deleteReviewAsAdmin`.
+Implemented functions:
 
-Customer checkout inventory reservation also runs through Cloud Code using `createOrderWithInventory`, so updated stock counts can be enforced server-side when an order is placed.
+- `deleteReviewAsAdmin`
+- `getAllUsers`
+- `deleteUserAsOwner`
+- `getUsersForVendorLinking`
+- `createVendorAsAdmin`
+- `linkVendorToUser`
+- `updateMyProfile`
+- `createOrderWithInventory`
+
+Key reason for Cloud Code:
+
+- Enforce role checks and secure owner/admin workflows
+- Reserve and decrement inventory server-side at checkout
+- Keep sensitive operations out of client-only logic
 
 To deploy it to Back4App:
 
