@@ -7,6 +7,7 @@ interface Props {
   vendors: Vendor[];
   initialBooths?: BoothPosition[];
   onChange: (booths: BoothPosition[]) => void;
+  pastLayoutByVendorSlug?: Map<string, { boothId: string; category: string }>;
   width?: number;
   height?: number;
 }
@@ -83,6 +84,7 @@ export default function AdminMapEditor({
   vendors,
   initialBooths = [],
   onChange,
+  pastLayoutByVendorSlug = new Map(),
   width = CANVAS_W,
   height = CANVAS_H,
 }: Props) {
@@ -177,22 +179,51 @@ export default function AdminMapEditor({
     return ids;
   }, [booths]);
 
-  const vendorAssignedBooth = useMemo(
-    () =>
-      new Map(
-        booths
-          .filter((booth) => booth.vendorSlug)
-          .map((booth) => [booth.vendorSlug, booth.boothId])
-      ),
-    [booths]
-  );
+  const vendorAssignedBooths = useMemo(() => {
+    const byVendor = new Map<string, string[]>();
+    booths
+      .filter((booth) => booth.vendorSlug)
+      .forEach((booth) => {
+        const list = byVendor.get(booth.vendorSlug) || [];
+        list.push(booth.boothId);
+        byVendor.set(booth.vendorSlug, list);
+      });
+    return byVendor;
+  }, [booths]);
 
   const assignableVendors = useMemo(
-    () =>
-      vendors.filter((vendor) =>
-        vendor.name.toLowerCase().includes(vendorSearch.toLowerCase())
-      ),
-    [vendors, vendorSearch]
+    () => {
+      const targetBooth = assigningTo
+        ? booths.find((booth) => booth.boothId === assigningTo) || null
+        : null;
+
+      const scoreVendor = (vendor: Vendor) => {
+        const previous = pastLayoutByVendorSlug.get(vendor.slug);
+        let score = 0;
+        if (previous?.boothId && assigningTo && previous.boothId === assigningTo) score += 150;
+        if (
+          previous?.category &&
+          targetBooth?.category &&
+          previous.category === targetBooth.category
+        ) {
+          score += 40;
+        }
+        if (targetBooth?.category && vendor.category === targetBooth.category) score += 30;
+        if (previous?.boothId) score += 10;
+        return score;
+      };
+
+      return vendors
+        .filter((vendor) =>
+          vendor.name.toLowerCase().includes(vendorSearch.toLowerCase())
+        )
+        .sort((left, right) => {
+          const scoreDiff = scoreVendor(right) - scoreVendor(left);
+          if (scoreDiff !== 0) return scoreDiff;
+          return left.name.localeCompare(right.name);
+        });
+    },
+    [assigningTo, booths, pastLayoutByVendorSlug, vendors, vendorSearch]
   );
 
   const commitBooths = useCallback(
@@ -448,11 +479,19 @@ export default function AdminMapEditor({
     const next = booths.map((booth) => {
       if (booth.vendorSlug) return booth;
 
+      const pastMatch = availableAny.find((vendor) => {
+        const previous = pastLayoutByVendorSlug.get(vendor.slug);
+        return (
+          !used.has(vendor.slug) &&
+          !!previous &&
+          previous.boothId === booth.boothId
+        );
+      });
       const inCategory = (availableByCategory.get(booth.category) || []).find(
         (vendor) => !used.has(vendor.slug)
       );
       const fallback = availableAny.find((vendor) => !used.has(vendor.slug));
-      const vendor = inCategory || fallback;
+      const vendor = pastMatch || inCategory || fallback;
       if (!vendor) return booth;
 
       used.add(vendor.slug);
@@ -461,7 +500,7 @@ export default function AdminMapEditor({
         vendorId: vendor.objectId,
         vendorSlug: vendor.slug,
         vendorName: vendor.name,
-        category: vendor.category,
+        category: vendor.category || booth.category,
       };
     });
 
@@ -492,15 +531,6 @@ export default function AdminMapEditor({
           vendorSlug: vendor.slug,
           vendorName: vendor.name,
           category: vendor.category,
-        };
-      }
-      if (booth.vendorSlug === vendor.slug) {
-        return {
-          ...booth,
-          vendorId: "",
-          vendorSlug: "",
-          vendorName: "Empty booth",
-          category: "default",
         };
       }
       return booth;
@@ -1058,7 +1088,7 @@ export default function AdminMapEditor({
               fontFamily: "DM Sans, sans-serif",
             }}
           >
-            Auto-assign by category
+            Smart auto-assign
           </button>
           {selectedIds.length > 0 && (
             <>
@@ -1609,8 +1639,17 @@ export default function AdminMapEditor({
                 </div>
               ) : (
                 assignableVendors.map((vendor) => {
-                  const currentBooth = vendorAssignedBooth.get(vendor.slug);
-                  const assignedElsewhere = currentBooth && currentBooth !== assigningTo;
+                  const currentBooths = vendorAssignedBooths.get(vendor.slug) || [];
+                  const assignedElsewhere = currentBooths.some(
+                    (boothId) => boothId !== assigningTo
+                  );
+                  const previous = pastLayoutByVendorSlug.get(vendor.slug);
+                  const suggestionHint =
+                    previous && assigningTo && previous.boothId === assigningTo
+                      ? "Previously in this booth"
+                      : previous
+                      ? `Previously in ${previous.boothId}`
+                      : "";
                   return (
                     <div
                       key={vendor.slug}
@@ -1645,10 +1684,11 @@ export default function AdminMapEditor({
                       >
                         {vendor.subcategory || vendor.category}
                         {assignedElsewhere
-                          ? ` · currently at ${currentBooth}`
-                          : currentBooth
+                          ? ` · currently at ${currentBooths.join(", ")}`
+                          : currentBooths.includes(assigningTo || "")
                           ? " · currently here"
                           : ""}
+                        {suggestionHint ? ` · ${suggestionHint}` : ""}
                       </div>
                     </div>
                   );

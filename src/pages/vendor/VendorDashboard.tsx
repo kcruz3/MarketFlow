@@ -3,6 +3,7 @@ import { useAuthContext } from "../../context/AuthContext";
 import { useVendorOrders, OrderStatus, OrderItem } from "../../hooks/useOrders";
 import { useMenuItems } from "../../hooks/useMenuItems";
 import { useMarketEvents } from "../../hooks/useMarketEvents";
+import { useVendorNotifications } from "../../hooks/useVendorNotifications";
 import { formatEventDate, isUpcomingDate } from "../../lib/marketEvents";
 import {
   IconShoppingCart,
@@ -53,6 +54,12 @@ export default function VendorDashboard() {
     deleteItem,
   } = useMenuItems(vendorSlug);
   const { events, loading: eLoading } = useMarketEvents();
+  const {
+    notifications,
+    loading: nLoading,
+    markAsRead,
+  } = useVendorNotifications(vendorSlug);
+  const unreadNotifications = notifications.filter((item) => !item.isRead);
   const [tab, setTab] = useState<"orders" | "menu" | "earnings" | "events">("orders");
   const [orderFilter, setOrderFilter] = useState<"active" | "fulfilled">(
     "active"
@@ -150,6 +157,12 @@ export default function VendorDashboard() {
             <span className="badge badge-amber">
               {activeOrders.length} active order
               {activeOrders.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          {unreadNotifications.length > 0 && (
+            <span className="badge badge-green">
+              {unreadNotifications.length} new assignment
+              {unreadNotifications.length !== 1 ? "s" : ""}
             </span>
           )}
         </div>
@@ -679,6 +692,61 @@ export default function VendorDashboard() {
         {/* EVENTS TAB */}
         {tab === "events" && (
           <div>
+            <div className="card" style={{ marginBottom: 18 }}>
+              <div className="card-header">
+                <h3>Assignment Notifications</h3>
+                <span className={`badge ${unreadNotifications.length ? "badge-amber" : "badge-gray"}`}>
+                  {unreadNotifications.length} unread
+                </span>
+              </div>
+              <div className="card-body">
+                {nLoading ? (
+                  <div className="loading-spinner">Loading notifications...</div>
+                ) : notifications.length === 0 ? (
+                  <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                    Assignment updates will appear here when you are assigned or moved to a booth.
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {notifications.slice(0, 8).map((notification) => (
+                      <button
+                        key={notification.objectId}
+                        onClick={() => markAsRead(notification.objectId)}
+                        style={{
+                          border: "1px solid var(--cream-dark)",
+                          borderLeft: notification.isRead
+                            ? "4px solid #d7d3c8"
+                            : "4px solid var(--forest-mid)",
+                          borderRadius: 8,
+                          background: "var(--white)",
+                          textAlign: "left",
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                          <div style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 600 }}>
+                            {notification.eventName}
+                          </div>
+                          {!notification.isRead && <span className="badge badge-green">New</span>}
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 4 }}>
+                          {notification.message}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 6 }}>
+                          {formatEventDate(notification.eventDate || null, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                          {notification.marketHours ? ` · ${notification.marketHours}` : ""}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ fontFamily: "Playfair Display, serif", fontSize: 18, color: "var(--green-deep)" }}>
                 Your Market Assignments

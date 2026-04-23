@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { useMarketEvents, MarketEvent } from "../../hooks/useMarketEvents";
 import EventList from "../../components/admin/EventList";
 import AddEventModal from "../../components/admin/AddEventModal";
-import { splitEventsByDate } from "../../lib/marketEvents";
+import { parseBoothMap, splitEventsByDate, validateEventForWorkflow } from "../../lib/marketEvents";
+import Parse from "../../lib/parse";
 
 export default function EventsPage() {
   const { events, loading, error, refetch } = useMarketEvents();
@@ -24,6 +25,74 @@ export default function EventsPage() {
   const handleSaved = () => {
     handleClose();
     refetch();
+  };
+
+  const handleStatusChange = async (
+    event: MarketEvent,
+    status: "draft" | "review" | "published"
+  ) => {
+    try {
+      await Parse.Cloud.run("updateEventWorkflowStatus", {
+        eventId: event.objectId,
+        status,
+      });
+      refetch();
+    } catch (e: any) {
+      const message = String(e?.message || "");
+      const invalidFunction =
+        message.includes('Invalid function: "updateEventWorkflowStatus"') ||
+        message.includes("Invalid function");
+      if (!invalidFunction) {
+        window.alert(message || "Unable to update event workflow status.");
+        return;
+      }
+
+      try {
+        const eventQuery = new Parse.Query("MarketEvent");
+        const eventObj = await eventQuery.get(event.objectId);
+        const selectedVendors = await eventObj
+          .relation("vendors")
+          .query()
+          .limit(1000)
+          .find();
+        const selectedVendorSlugs = selectedVendors
+          .map((vendor) => String(vendor.get("slug") || "").trim())
+          .filter(Boolean);
+        const validation = validateEventForWorkflow({
+          name: String(eventObj.get("name") || ""),
+          date: eventObj.get("date"),
+          hours: String(eventObj.get("hours") || ""),
+          address: String(eventObj.get("address") || ""),
+          selectedVendorSlugs,
+          boothMap: parseBoothMap(eventObj.get("boothMap")),
+        });
+
+        if (status === "review" && !validation.canSubmitForReview) {
+          window.alert(validation.reviewIssues.join(" "));
+          return;
+        }
+        if (status === "published" && !validation.canPublish) {
+          window.alert(validation.publishIssues.join(" "));
+          return;
+        }
+
+        eventObj.set("workflowStatus", status);
+        eventObj.set("isPublished", status === "published");
+        eventObj.set("reviewChecklist", validation.checklist);
+        eventObj.set(
+          "reviewIssues",
+          status === "published" ? validation.publishIssues : validation.reviewIssues
+        );
+        eventObj.set("lastValidatedAt", new Date());
+        await eventObj.save();
+        refetch();
+      } catch (fallbackError: any) {
+        window.alert(
+          fallbackError?.message ||
+            "Unable to update event workflow status (fallback failed)."
+        );
+      }
+    }
   };
 
   return (
@@ -58,7 +127,11 @@ export default function EventsPage() {
                 </span>
               </div>
               <div className="card-body">
-                <EventList events={upcoming} onEdit={handleEdit} />
+                <EventList
+                  events={upcoming}
+                  onEdit={handleEdit}
+                  onStatusChange={handleStatusChange}
+                />
               </div>
             </div>
 
@@ -69,7 +142,11 @@ export default function EventsPage() {
                   <span className="badge badge-gray">{past.length} events</span>
                 </div>
                 <div className="card-body">
-                  <EventList events={past} onEdit={handleEdit} />
+                  <EventList
+                    events={past}
+                    onEdit={handleEdit}
+                    onStatusChange={handleStatusChange}
+                  />
                 </div>
               </div>
             )}

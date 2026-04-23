@@ -47,25 +47,66 @@ export default function MapPage() {
   );
   const [mapTab, setMapTab] = useState<"map" | "events">("map");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [eventDateFilter, setEventDateFilter] = useState<"all" | "next30" | "thisMonth">(
+    "all"
+  );
+  const [eventCategoryFilter, setEventCategoryFilter] = useState("All");
+  const [mapCategoryFilter, setMapCategoryFilter] = useState("All");
+  const [mapSearch, setMapSearch] = useState("");
   const [ratingsBySlug, setRatingsBySlug] = useState<
     Map<string, { average: number; count: number }>
   >(new Map());
 
+  const allPublishedEvents = sortEventsByDateAsc(events.filter((event) => event.isPublished));
+  const now = new Date();
+  const isInNext30Days = (value: Date) => {
+    const current = new Date(now.getTime());
+    const end = new Date(now.getTime());
+    end.setDate(end.getDate() + 30);
+    return value >= current && value <= end;
+  };
+  const isInThisMonth = (value: Date) =>
+    value.getFullYear() === now.getFullYear() && value.getMonth() === now.getMonth();
+
+  const categoryOptions = [
+    "All",
+    ...Array.from(
+      new Set(
+        allPublishedEvents.flatMap((event) =>
+          event.boothMap.map((booth) => booth.category).filter(Boolean)
+        )
+      )
+    ).sort(),
+  ];
+
+  const filteredPublishedEvents = allPublishedEvents.filter((event) => {
+    const eventDate = new Date(event.date);
+    const dateMatch =
+      eventDateFilter === "all"
+        ? true
+        : eventDateFilter === "next30"
+        ? isInNext30Days(eventDate)
+        : isInThisMonth(eventDate);
+    const categoryMatch =
+      eventCategoryFilter === "All"
+        ? true
+        : event.boothMap.some((booth) => booth.category === eventCategoryFilter);
+    return dateMatch && categoryMatch;
+  });
   const publishedEvents = sortEventsByDateAsc(
-    events.filter((event) => event.isPublished && isUpcomingDate(event.date))
+    filteredPublishedEvents.filter((event) => isUpcomingDate(event.date))
   );
-  const allPublishedEvents = sortEventsByDateAsc(
-    events.filter((event) => event.isPublished)
-  );
-  const publishedByDate = splitEventsByDate(allPublishedEvents);
+  const publishedByDate = splitEventsByDate(filteredPublishedEvents);
   const pastPublishedEvents = [...publishedByDate.past].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
   const nextEvent = publishedEvents[0] ?? null;
   const selectedEvent =
-    publishedEvents.find((event) => event.objectId === selectedEventId) ??
-    nextEvent;
+    filteredPublishedEvents.find((event) => event.objectId === selectedEventId) ??
+    nextEvent ??
+    filteredPublishedEvents[0] ??
+    null;
 
   const resolveVendorForBooth = (booth: BoothPosition) => {
     const currentSlug = (booth.vendorSlug || "").trim();
@@ -164,6 +205,22 @@ export default function MapPage() {
           : fallbackRating?.count ?? null,
     };
   });
+  const mapCategoryOptions = [
+    "All",
+    ...Array.from(new Set(booths.map((booth) => booth.category).filter(Boolean))).sort(),
+  ];
+
+  const normalizedMapSearch = mapSearch.trim().toLowerCase();
+  const visibleBooths = booths.filter((booth) => {
+    const categoryMatch =
+      mapCategoryFilter === "All" || booth.category === mapCategoryFilter;
+    const searchMatch =
+      !normalizedMapSearch ||
+      booth.vendorName.toLowerCase().includes(normalizedMapSearch) ||
+      booth.boothId.toLowerCase().includes(normalizedMapSearch) ||
+      booth.vendorSlug.toLowerCase().includes(normalizedMapSearch);
+    return categoryMatch && searchMatch;
+  });
 
   return (
     <div>
@@ -195,6 +252,39 @@ export default function MapPage() {
               <div style={s.heroBannerMonth}>
                 {formatEventDate(selectedEvent.date, { month: "long" })}
               </div>
+            </div>
+          </div>
+        )}
+
+        {!eLoading && allPublishedEvents.length > 0 && (
+          <div style={s.filterBar}>
+            <div style={s.filterGroup}>
+              <label style={s.filterLabel}>Event date</label>
+              <select
+                value={eventDateFilter}
+                onChange={(e) =>
+                  setEventDateFilter(e.target.value as "all" | "next30" | "thisMonth")
+                }
+                style={s.filterSelect}
+              >
+                <option value="all">All published dates</option>
+                <option value="next30">Next 30 days</option>
+                <option value="thisMonth">This month</option>
+              </select>
+            </div>
+            <div style={s.filterGroup}>
+              <label style={s.filterLabel}>Event category</label>
+              <select
+                value={eventCategoryFilter}
+                onChange={(e) => setEventCategoryFilter(e.target.value)}
+                style={s.filterSelect}
+              >
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         )}
@@ -294,13 +384,41 @@ export default function MapPage() {
             {selectedEvent ? (
               booths.length > 0 ? (
                 <>
+                  <div style={s.filterBar}>
+                    <div style={{ ...s.filterGroup, minWidth: 240 }}>
+                      <label style={s.filterLabel}>Find vendor or booth</label>
+                      <input
+                        value={mapSearch}
+                        onChange={(e) => setMapSearch(e.target.value)}
+                        placeholder="Search by vendor name or booth (e.g. B12)"
+                        style={s.filterInput}
+                      />
+                    </div>
+                    <div style={s.filterGroup}>
+                      <label style={s.filterLabel}>Map category</label>
+                      <select
+                        value={mapCategoryFilter}
+                        onChange={(e) => setMapCategoryFilter(e.target.value)}
+                        style={s.filterSelect}
+                      >
+                        {mapCategoryOptions.map((category) => (
+                          <option key={category} value={category}>
+                            {category}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <div style={s.mapContext}>
                     Showing booth map for{" "}
                     <strong style={{ color: "var(--forest)" }}>
                       {selectedEvent.name}
                     </strong>
+                    <span style={{ marginLeft: 8 }}>
+                      · {visibleBooths.length} of {booths.length} booths shown
+                    </span>
                   </div>
-                  <MarketMap booths={booths} />
+                  <MarketMap booths={visibleBooths} />
                 </>
               ) : (
                 <div className="map-container">
@@ -433,6 +551,43 @@ export default function MapPage() {
 }
 
 const s: Record<string, React.CSSProperties> = {
+  filterBar: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+    marginBottom: 16,
+    alignItems: "flex-end",
+  },
+  filterGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    minWidth: 180,
+  },
+  filterLabel: {
+    fontSize: 12,
+    color: "var(--text-muted)",
+    textTransform: "uppercase",
+    letterSpacing: "0.6px",
+  },
+  filterSelect: {
+    padding: "8px 10px",
+    borderRadius: 8,
+    border: "1px solid var(--cream-dark)",
+    background: "var(--white)",
+    fontSize: 13,
+    color: "var(--text-secondary)",
+    fontFamily: "DM Sans, sans-serif",
+  },
+  filterInput: {
+    padding: "8px 10px",
+    borderRadius: 8,
+    border: "1px solid var(--cream-dark)",
+    background: "var(--white)",
+    fontSize: 13,
+    color: "var(--text-secondary)",
+    fontFamily: "DM Sans, sans-serif",
+  },
   heroBanner: {
     background: "var(--forest)",
     borderRadius: 12,

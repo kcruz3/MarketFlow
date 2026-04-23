@@ -1,12 +1,14 @@
 /// <reference types="jest" />
 
 import {
+  deriveWorkflowStatus,
   isUpcomingDate,
   parseBoothMap,
   serializeBoothMap,
   sortEventsByDateAsc,
   splitEventsByDate,
   toDateInputValue,
+  validateEventForWorkflow,
 } from "./marketEvents";
 
 describe("marketEvents test harness", () => {
@@ -130,5 +132,37 @@ describe("marketEvents test harness", () => {
     expect(grouped.past.map((event) => event.objectId)).toEqual(["1"]);
     expect(isUpcomingDate(events[0].date, now)).toBe(true);
     expect(isUpcomingDate(events[1].date, now)).toBe(false);
+  });
+
+  it("derives workflow status from stored values", () => {
+    expect(deriveWorkflowStatus("review", false)).toBe("review");
+    expect(deriveWorkflowStatus(undefined, true)).toBe("published");
+    expect(deriveWorkflowStatus(undefined, false)).toBe("draft");
+  });
+
+  it("validates publish readiness with vendor and booth checks", () => {
+    const validation = validateEventForWorkflow({
+      name: "Summer Market",
+      date: "2026-05-01",
+      hours: "10:00 AM – 3:00 PM",
+      address: "1105 Northside Blvd",
+      selectedVendorSlugs: ["vendor-a", "vendor-b"],
+      boothMap: [
+        {
+          boothId: "A1",
+          vendorSlug: "vendor-a",
+          vendorName: "Vendor A",
+          category: "Prepared Food",
+          x: 10,
+          y: 10,
+          w: 80,
+          h: 80,
+        },
+      ],
+    });
+
+    expect(validation.canSubmitForReview).toBe(true);
+    expect(validation.canPublish).toBe(true);
+    expect(validation.checklist.allSelectedVendorsAssigned).toBe(false);
   });
 });

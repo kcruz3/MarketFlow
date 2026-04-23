@@ -28,7 +28,7 @@ async function requireOwnerUser(user) {
   const role = await roleQuery.first({ useMasterKey: true });
   if (!role) {
     throw new Parse.Error(
-      Parse.Error.OPERATION_FORBIDDEN,
+      Parse.Error.OPERATON_FORBIDDEN,
       "Owner access is required."
     );
   }
@@ -495,4 +495,254 @@ Parse.Cloud.define("createOrderWithInventory", async (request) => {
 
   await order.save(null, { useMasterKey: true });
   return mapOrder(order);
+});
+
+function parseBoothMapForCloud(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object") return Object.values(raw);
+  return [];
+}
+
+function boothOverlaps(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function validateEventWorkflowState({
+  name,
+  date,
+  hours,
+  address,
+  selectedVendorSlugs,
+  boothMap,
+}) {
+  const selectedSet = new Set((selectedVendorSlugs || []).filter(Boolean));
+  const assignedBooths = (boothMap || []).filter((booth) =>
+    String(booth.vendorSlug || "").trim()
+  );
+  const assignedSlugs = assignedBooths.map((booth) => String(booth.vendorSlug || "").trim());
+  const assignedSet = new Set(assignedSlugs);
+
+  const overlaps = new Set();
+  for (let i = 0; i < boothMap.length; i += 1) {
+    for (let j = i + 1; j < boothMap.length; j += 1) {
+      if (boothOverlaps(boothMap[i], boothMap[j])) {
+        overlaps.add(boothMap[i].boothId);
+        overlaps.add(boothMap[j].boothId);
+      }
+    }
+  }
+
+  const unknownAssigned = assignedSlugs.filter((slug) => !selectedSet.has(slug));
+  const missingAssigned = Array.from(selectedSet).filter((slug) => !assignedSet.has(slug));
+
+  const detailsComplete =
+    !!String(name || "").trim() &&
+    !!date &&
+    !Number.isNaN(new Date(date).getTime()) &&
+    !!String(hours || "").trim() &&
+    !!String(address || "").trim();
+  const hasVendors = selectedSet.size > 0;
+  const hasBooths = boothMap.length > 0;
+
+  const reviewIssues = [];
+  if (!detailsComplete) {
+    reviewIssues.push("Complete event details (name, date, hours, address).");
+  }
+  if (!hasVendors) {
+    reviewIssues.push("Select at least one vendor.");
+  }
+
+  const publishIssues = [...reviewIssues];
+  if (!hasBooths) {
+    publishIssues.push("Create at least one booth.");
+  }
+  if (overlaps.size > 0) {
+    publishIssues.push(`Resolve booth overlaps (${overlaps.size} overlapping).`);
+  }
+  if (unknownAssigned.length > 0) {
+    publishIssues.push(
+      `Remove vendors assigned in map but not selected (${unknownAssigned.length} found).`
+    );
+  }
+
+  return {
+    reviewIssues,
+    publishIssues,
+    canSubmitForReview: reviewIssues.length === 0,
+    canPublish: publishIssues.length === 0,
+    checklist: {
+      detailsComplete,
+      hasVendors,
+      hasBooths,
+      allSelectedVendorsAssigned: missingAssigned.length === 0,
+      noOverlappingBooths: overlaps.size === 0,
+      noUnknownAssignedVendors: unknownAssigned.length === 0,
+    },
+  };
+}
+
+Parse.Cloud.define("updateEventWorkflowStatus", async (request) => {
+  await requireAdminUser(request.user);
+
+  const eventId = String(request.params?.eventId || "").trim();
+  const status = String(request.params?.status || "").trim();
+  if (!eventId || !["draft", "review", "published"].includes(status)) {
+    throw new Parse.Error(
+      Parse.Error.INVALID_QUERY,
+      "eventId and valid status are required."
+    );
+  }
+
+  const eventQuery = new Parse.Query("MarketEvent");
+  const event = await eventQuery.get(eventId, { useMasterKey: true });
+  const relation = event.relation("vendors");
+  const vendorObjects = await relation.query().limit(1000).find({ useMasterKey: true });
+  const selectedVendorSlugs = vendorObjects
+    .map((vendor) => String(vendor.get("slug") || "").trim())
+    .filter(Boolean);
+  const boothMap = parseBoothMapForCloud(event.get("boothMap")).map((booth) => ({
+    boothId: booth.boothId,
+    vendorSlug: String(booth.vendorSlug || "").trim(),
+    x: Number(booth.x || 0),
+    y: Number(booth.y || 0),
+    w: Number(booth.w || 0),
+    h: Number(booth.h || 0),
+  }));
+
+  const validation = validateEventWorkflowState({
+    name: event.get("name"),
+    date: event.get("date"),
+    hours: event.get("hours"),
+    address: event.get("address"),
+    selectedVendorSlugs,
+    boothMap,
+  });
+
+  if (status === "review" && !validation.canSubmitForReview) {
+    throw new Parse.Error(
+      Parse.Error.VALIDATION_ERROR,
+      validation.reviewIssues.join(" ")
+    );
+  }
+  if (status === "published" && !validation.canPublish) {
+    throw new Parse.Error(
+      Parse.Error.VALIDATION_ERROR,
+      validation.publishIssues.join(" ")
+    );
+  }
+
+  event.set("workflowStatus", status);
+  event.set("isPublished", status === "published");
+  event.set("reviewChecklist", validation.checklist);
+  event.set(
+    "reviewIssues",
+    status === "published" ? validation.publishIssues : validation.reviewIssues
+  );
+  event.set("lastValidatedAt", new Date());
+  await event.save(null, { useMasterKey: true });
+
+  return {
+    success: true,
+    eventId: event.id,
+    status,
+    checklist: validation.checklist,
+    issues: status === "published" ? validation.publishIssues : validation.reviewIssues,
+  };
+});
+
+Parse.Cloud.define("notifyVendorAssignmentChanges", async (request) => {
+  await requireAdminUser(request.user);
+
+  const eventId = String(request.params?.eventId || "").trim();
+  const eventName = String(request.params?.eventName || "").trim();
+  const eventDateRaw = request.params?.eventDate;
+  const eventAddress = String(request.params?.eventAddress || "").trim();
+  const marketHours = String(request.params?.marketHours || "").trim();
+  const previousBoothMap = parseBoothMapForCloud(request.params?.previousBoothMap);
+  const nextBoothMap = parseBoothMapForCloud(request.params?.nextBoothMap);
+
+  const eventDate = eventDateRaw ? new Date(eventDateRaw) : null;
+
+  const previousByVendor = new Map();
+  previousBoothMap.forEach((booth) => {
+    const slug = String(booth.vendorSlug || "").trim();
+    if (!slug || previousByVendor.has(slug)) return;
+    previousByVendor.set(slug, String(booth.boothId || "").trim());
+  });
+
+  const nextByVendor = new Map();
+  nextBoothMap.forEach((booth) => {
+    const slug = String(booth.vendorSlug || "").trim();
+    if (!slug || nextByVendor.has(slug)) return;
+    nextByVendor.set(slug, String(booth.boothId || "").trim());
+  });
+
+  const allVendorSlugs = new Set([...previousByVendor.keys(), ...nextByVendor.keys()]);
+  if (allVendorSlugs.size === 0) {
+    return { success: true, created: 0 };
+  }
+
+  const vendorQuery = new Parse.Query("Vendor");
+  vendorQuery.containedIn("slug", Array.from(allVendorSlugs));
+  vendorQuery.limit(1000);
+  const vendors = await vendorQuery.find({ useMasterKey: true });
+  const vendorBySlug = new Map(vendors.map((vendor) => [vendor.get("slug"), vendor]));
+
+  const notifications = [];
+  allVendorSlugs.forEach((slug) => {
+    const previousBoothId = previousByVendor.get(slug) || "";
+    const boothId = nextByVendor.get(slug) || "";
+    if (previousBoothId === boothId) return;
+
+    const vendor = vendorBySlug.get(slug);
+    if (!vendor) return;
+
+    const ownerId = String(vendor.get("ownerId") || "").trim();
+    if (!ownerId) return;
+
+    let type = "assigned";
+    let message = `You've been assigned to booth ${boothId}.`;
+    if (previousBoothId && boothId) {
+      type = "reassigned";
+      message = `Your booth changed from ${previousBoothId} to ${boothId}.`;
+    } else if (previousBoothId && !boothId) {
+      type = "unassigned";
+      message = `Your booth assignment (${previousBoothId}) was removed.`;
+    }
+
+    const notification = new Parse.Object("VendorNotification");
+    notification.set("vendorSlug", slug);
+    notification.set("eventId", eventId || null);
+    notification.set("eventName", eventName || "Market event");
+    if (eventDate && !Number.isNaN(eventDate.getTime())) {
+      notification.set("eventDate", eventDate);
+    }
+    notification.set("eventAddress", eventAddress);
+    notification.set("marketHours", marketHours);
+    notification.set("previousBoothId", previousBoothId);
+    notification.set("boothId", boothId);
+    notification.set("type", type);
+    notification.set("message", message);
+    notification.set("isRead", false);
+
+    const acl = new Parse.ACL();
+    acl.setPublicReadAccess(false);
+    acl.setPublicWriteAccess(false);
+    acl.setReadAccess(ownerId, true);
+    acl.setWriteAccess(ownerId, true);
+    acl.setRoleReadAccess("admin", true);
+    acl.setRoleWriteAccess("admin", true);
+    acl.setRoleReadAccess("owner", true);
+    acl.setRoleWriteAccess("owner", true);
+    notification.setACL(acl);
+
+    notifications.push(notification);
+  });
+
+  if (notifications.length > 0) {
+    await Parse.Object.saveAll(notifications, { useMasterKey: true });
+  }
+
+  return { success: true, created: notifications.length };
 });

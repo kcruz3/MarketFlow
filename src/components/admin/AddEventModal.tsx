@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { useVendors } from "../../hooks/useVendors";
-import { MarketEvent } from "../../hooks/useMarketEvents";
+import { MarketEvent, useMarketEvents } from "../../hooks/useMarketEvents";
 import Parse from "../../lib/parse";
 import AdminMapEditor from "./AdminMapEditor";
 import { BoothPosition } from "../consumer/MarketMap";
 import {
+  EventWorkflowStatus,
+  formatEventDate,
+  isUpcomingDate,
   parseBoothMap,
   serializeBoothMap,
   toDateInputValue,
+  validateEventForWorkflow,
 } from "../../lib/marketEvents";
 
 interface Props {
@@ -26,7 +30,7 @@ const STEP_LABELS: Record<Step, string> = {
 const STEP_HELP: Record<Step, string> = {
   details: "Set the event basics first.",
   vendors: "Pick who is participating.",
-  booths: "Assign selected vendors to booths.",
+  booths: "Assign vendors to booths (partial assignment is allowed).",
 };
 const HOURS_PRESETS = [
   "8:00 AM – 12:00 PM",
@@ -35,12 +39,20 @@ const HOURS_PRESETS = [
   "11:00 AM – 4:00 PM",
 ];
 
+const DEFAULT_EVENT_ADDRESS = "1105 Northside Blvd, South Bend, IN 46615";
+const WORKFLOW_LABELS: Record<EventWorkflowStatus, string> = {
+  draft: "Draft",
+  review: "In Review",
+  published: "Published",
+};
+
 export default function AddEventModal({
   onClose,
   onSaved,
   event: editEvent,
 }: Props) {
   const { vendors } = useVendors();
+  const { events: allEvents } = useMarketEvents();
   const isEditing = !!editEvent;
   const mapDraftStorageKey = `marketflow:booth-map-draft:${
     editEvent?.objectId ?? "new-event"
@@ -67,9 +79,11 @@ export default function AddEventModal({
   const [endDate, setEndDate] = useState(toDateInputValue(editEvent?.endDate));
   const [hours, setHours] = useState(editEvent?.hours ?? "10:00 AM – 3:00 PM");
   const [notes, setNotes] = useState(editEvent?.notes ?? "");
-  const [isPublished, setIsPublished] = useState(
-    editEvent?.isPublished ?? false
+  const [address, setAddress] = useState(editEvent?.address ?? DEFAULT_EVENT_ADDRESS);
+  const [workflowStatus, setWorkflowStatus] = useState<EventWorkflowStatus>(
+    editEvent?.workflowStatus ?? (editEvent?.isPublished ? "published" : "draft")
   );
+  const [showPublishIssues, setShowPublishIssues] = useState(false);
   const [selectedVendorSlugs, setSelectedVendorSlugs] = useState<Set<string>>(
     new Set()
   );
@@ -136,11 +150,36 @@ export default function AddEventModal({
     );
   };
 
+  const historicalEvents = allEvents
+    .filter((event) => event.objectId !== editEvent?.objectId)
+    .filter((event) => event.boothMap.length > 0)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const latestLayoutEvent = historicalEvents[0] ?? null;
+
+  const pastLayoutByVendor = new Map<string, { boothId: string; category: string }>();
+  historicalEvents.forEach((event) => {
+    event.boothMap.forEach((booth) => {
+      const slug = (booth.vendorSlug || "").trim();
+      if (!slug || pastLayoutByVendor.has(slug)) return;
+      pastLayoutByVendor.set(slug, {
+        boothId: booth.boothId,
+        category: booth.category || "default",
+      });
+    });
+  });
+
   const copyFromLastEvent = () => {
-    // Find the most recent past event with vendors
-    // We use the events from the hook — passed as a prop below
-    // For now just select all vendors as a fallback
-    setSelectedVendorSlugs(new Set(vendors.map((v) => v.slug)));
+    const previous = latestLayoutEvent;
+    if (!previous) {
+      setSelectedVendorSlugs(new Set(vendors.map((v) => v.slug)));
+      return;
+    }
+
+    const previousVendorSlugs = previous.boothMap
+      .map((booth) => (booth.vendorSlug || "").trim())
+      .filter(Boolean);
+    setSelectedVendorSlugs(new Set(previousVendorSlugs));
+    setBoothMap(previous.boothMap.map((booth) => ({ ...booth })));
   };
 
   const toggleVendor = (slug: string) => {
@@ -148,7 +187,7 @@ export default function AddEventModal({
       const next = new Set(prev);
       if (next.has(slug)) {
         next.delete(slug);
-        setBoothMap(boothMap.filter((b) => b.boothId !== slug));
+        setBoothMap((current) => current.filter((b) => b.vendorSlug !== slug));
       } else {
         next.add(slug);
       }
@@ -160,6 +199,7 @@ export default function AddEventModal({
     if (!name.trim()) return "Event name is required";
     if (!date) return "Event date is required";
     if (!hours.trim()) return "Market hours are required";
+    if (!address.trim()) return "Event address is required";
     return null;
   };
   const endDateError =
@@ -169,6 +209,14 @@ export default function AddEventModal({
   const detailError = validateDetails();
   const canContinueDetails = !detailError && !endDateError;
   const currentStepIndex = STEP_ORDER.indexOf(step);
+  const workflowValidation = validateEventForWorkflow({
+    name,
+    date,
+    hours,
+    address,
+    selectedVendorSlugs: Array.from(selectedVendorSlugs),
+    boothMap,
+  });
 
   const handleNext = () => {
     if (step === "details") {
@@ -188,34 +236,33 @@ export default function AddEventModal({
     }
   };
 
-  const saveBoothMapOnly = async () => {
-    if (!editEvent) return;
-    setSaving(true);
-    setError("");
-    try {
-      const q = new Parse.Query("MarketEvent");
-      const obj = await q.get(editEvent.objectId);
-      obj.set("boothMap", serializeBoothMap(boothMap));
-      await obj.save();
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem(mapDraftStorageKey);
-      }
-      onSaved();
-    } catch (e: any) {
-      setError(e.message || "Failed to save map");
-      setSaving(false);
-    }
-  };
+  const handleSave = async (targetStatus?: EventWorkflowStatus) => {
+    const desiredStatus = targetStatus || workflowStatus;
+    const shouldPublish = desiredStatus === "published";
+    const shouldSubmitForReview = desiredStatus === "review";
 
-  const handleSave = async () => {
+    if (shouldSubmitForReview && !workflowValidation.canSubmitForReview) {
+      setError("Complete required details and vendor selection before sending to review.");
+      setShowPublishIssues(true);
+      return;
+    }
+
+    if (shouldPublish && !workflowValidation.canPublish) {
+      setError("This event cannot be published until all validation checks pass.");
+      setShowPublishIssues(true);
+      return;
+    }
+
     setSaving(true);
     setError("");
     try {
       let obj: Parse.Object;
+      let previousBoothMap: BoothPosition[] = [];
 
       if (isEditing) {
         const q = new Parse.Query("MarketEvent");
         obj = await q.get(editEvent.objectId);
+        previousBoothMap = parseBoothMap(obj.get("boothMap"));
       } else {
         const MarketEvent = Parse.Object.extend("MarketEvent");
         obj = new MarketEvent();
@@ -224,10 +271,20 @@ export default function AddEventModal({
       obj.set("name", name.trim());
       obj.set("date", new Date(date));
       if (endDate) obj.set("endDate", new Date(endDate));
+      if (!endDate) obj.unset("endDate");
       obj.set("hours", hours.trim());
-      obj.set("address", "1105 Northside Blvd, South Bend, IN 46615");
+      obj.set("address", address.trim());
       obj.set("notes", notes.trim());
-      obj.set("isPublished", isPublished);
+      obj.set("workflowStatus", desiredStatus);
+      obj.set("isPublished", shouldPublish);
+      obj.set("reviewChecklist", workflowValidation.checklist);
+      obj.set(
+        "reviewIssues",
+        desiredStatus === "published"
+          ? workflowValidation.publishIssues
+          : workflowValidation.reviewIssues
+      );
+      obj.set("lastValidatedAt", new Date());
       obj.set("boothMap", serializeBoothMap(boothMap));
       await obj.save();
 
@@ -249,12 +306,27 @@ export default function AddEventModal({
       }
 
       await obj.save();
+
+      if (isEditing || selectedVendorSlugs.size > 0) {
+        await Parse.Cloud.run("notifyVendorAssignmentChanges", {
+          eventId: obj.id,
+          previousBoothMap,
+          nextBoothMap: boothMap,
+          eventName: name.trim(),
+          eventDate: date ? new Date(date).toISOString() : null,
+          eventAddress: address.trim(),
+          marketHours: hours.trim(),
+        });
+      }
+
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(mapDraftStorageKey);
       }
+      setWorkflowStatus(desiredStatus);
       onSaved();
     } catch (e: any) {
       setError(e.message || "Failed to save event");
+    } finally {
       setSaving(false);
     }
   };
@@ -330,6 +402,57 @@ export default function AddEventModal({
         {/* Body */}
         <div style={s.body}>
           {error && <div style={s.error}>{error}</div>}
+          <div style={s.workflowPanel}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div style={s.workflowTitle}>Publishing Workflow</div>
+                <div style={s.workflowSub}>
+                  Current status:{" "}
+                  <strong>{WORKFLOW_LABELS[workflowStatus]}</strong>
+                </div>
+              </div>
+              <span
+                className={`badge ${
+                  workflowStatus === "published"
+                    ? "badge-green"
+                    : workflowStatus === "review"
+                    ? "badge-amber"
+                    : "badge-gray"
+                }`}
+              >
+                {WORKFLOW_LABELS[workflowStatus]}
+              </span>
+            </div>
+            <div style={s.checklistGrid}>
+              <div style={s.checkItem}>
+                <span>{workflowValidation.checklist.detailsComplete ? "✓" : "•"}</span>
+                <span>Details complete</span>
+              </div>
+              <div style={s.checkItem}>
+                <span>{workflowValidation.checklist.hasVendors ? "✓" : "•"}</span>
+                <span>Vendors selected</span>
+              </div>
+              <div style={s.checkItem}>
+                <span>{workflowValidation.checklist.hasBooths ? "✓" : "•"}</span>
+                <span>Booths created</span>
+              </div>
+              <div style={s.checkItem}>
+                <span>{workflowValidation.checklist.allSelectedVendorsAssigned ? "✓" : "•"}</span>
+                <span>All selected vendors assigned (optional)</span>
+              </div>
+              <div style={s.checkItem}>
+                <span>{workflowValidation.checklist.noOverlappingBooths ? "✓" : "•"}</span>
+                <span>No booth overlaps</span>
+              </div>
+            </div>
+            {showPublishIssues && workflowValidation.publishIssues.length > 0 && (
+              <div style={s.validationList}>
+                {workflowValidation.publishIssues.map((issue) => (
+                  <div key={issue}>• {issue}</div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Step 1: Details */}
           {step === "details" && (
@@ -426,6 +549,16 @@ export default function AddEventModal({
                 </div>
               </div>
               <div style={s.field}>
+                <label style={s.label}>Address *</label>
+                <input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="1105 Northside Blvd, South Bend, IN 46615"
+                  style={s.input}
+                />
+                <div style={s.hint}>This appears on customer and vendor event views.</div>
+              </div>
+              <div style={s.field}>
                 <label style={s.label}>
                   Notes <span style={s.opt}>(optional)</span>
                 </label>
@@ -437,24 +570,6 @@ export default function AddEventModal({
                   style={{ ...s.input, resize: "vertical" }}
                 />
               </div>
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  cursor: "pointer",
-                  fontSize: 14,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isPublished}
-                  onChange={(e) => setIsPublished(e.target.checked)}
-                />
-                <span>
-                  Publish <span style={s.opt}>(visible to customers)</span>
-                </span>
-              </label>
               {endDateError && <div style={s.error}>{endDateError}</div>}
             </div>
           )}
@@ -467,6 +582,17 @@ export default function AddEventModal({
                 <div style={s.stepCalloutText}>
                   Select every vendor participating in this event.
                 </div>
+                {latestLayoutEvent && (
+                  <div style={{ ...s.stepCalloutText, marginTop: 6 }}>
+                    Last saved layout: {latestLayoutEvent.name} on{" "}
+                    {formatEventDate(latestLayoutEvent.date, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                    {isUpcomingDate(latestLayoutEvent.date) ? " (upcoming)" : " (past)"}.
+                  </div>
+                )}
               </div>
               {/* Toolbar */}
               <div
@@ -505,7 +631,7 @@ export default function AddEventModal({
                   Deselect all
                 </button>
                 <button onClick={copyFromLastEvent} style={{ ...s.chipBtn }}>
-                  Select all vendors
+                  Copy from most recent layout
                 </button>
               </div>
 
@@ -662,12 +788,12 @@ export default function AddEventModal({
                   marginBottom: 16,
                 }}
               >
-                Click a booth to assign a vendor. Only vendors selected in step
-                2 are available.
+                Click a booth to assign vendors. Suggestions are ranked by category fit and past layout.
               </p>
               <AdminMapEditor
                 vendors={selectedVendors}
                 initialBooths={boothMap}
+                pastLayoutByVendorSlug={pastLayoutByVendor}
                 onChange={setBoothMap}
               />
             </div>
@@ -705,13 +831,52 @@ export default function AddEventModal({
                 Next →
               </button>
             ) : (
-              <button onClick={handleSave} style={s.saveBtn} disabled={saving}>
-                {saving
-                  ? "Saving..."
-                  : isEditing
-                  ? "✓ Save Changes"
-                  : "✓ Create Event"}
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setShowPublishIssues(false);
+                    handleSave("draft");
+                  }}
+                  style={s.backBtn}
+                  disabled={saving}
+                >
+                  {saving && workflowStatus === "draft"
+                    ? "Saving..."
+                    : "Save Draft"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPublishIssues(true);
+                    handleSave("review");
+                  }}
+                  style={s.reviewBtn}
+                  disabled={saving || !workflowValidation.canSubmitForReview}
+                  title={
+                    workflowValidation.canSubmitForReview
+                      ? "Submit this event for review"
+                      : "Complete details and vendor selection first"
+                  }
+                >
+                  Submit for Review
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPublishIssues(true);
+                    handleSave("published");
+                  }}
+                  style={s.saveBtn}
+                  disabled={saving || !workflowValidation.canPublish}
+                  title={
+                    workflowValidation.canPublish
+                      ? "Publish event to customer and vendor views"
+                      : "Resolve workflow checks before publishing"
+                  }
+                >
+                  {saving && workflowStatus === "published"
+                    ? "Publishing..."
+                    : "Publish Event"}
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -780,6 +945,43 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   body: { flex: 1, overflowY: "auto", padding: "24px 28px" },
+  workflowPanel: {
+    border: "1px solid var(--cream-dark)",
+    borderRadius: 12,
+    background: "var(--cream)",
+    padding: "12px 14px",
+    marginBottom: 16,
+  },
+  workflowTitle: {
+    fontSize: 13,
+    color: "var(--forest)",
+    fontWeight: 700,
+    marginBottom: 2,
+  },
+  workflowSub: {
+    fontSize: 12.5,
+    color: "var(--text-secondary)",
+  },
+  checklistGrid: {
+    marginTop: 10,
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 8,
+  },
+  checkItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 12.5,
+    color: "var(--text-secondary)",
+  },
+  validationList: {
+    marginTop: 10,
+    fontSize: 12.5,
+    color: "#9f2f2f",
+    display: "grid",
+    gap: 4,
+  },
   error: {
     background: "#fff0f0",
     border: "1px solid #ffcdd2",
@@ -887,6 +1089,17 @@ const s: Record<string, React.CSSProperties> = {
     color: "white",
     fontSize: 14,
     fontWeight: 500,
+    cursor: "pointer",
+    fontFamily: "DM Sans, sans-serif",
+  },
+  reviewBtn: {
+    padding: "9px 20px",
+    borderRadius: 8,
+    border: "1px solid var(--cream-dark)",
+    background: "var(--white)",
+    color: "var(--text-secondary)",
+    fontSize: 14,
+    fontWeight: 600,
     cursor: "pointer",
     fontFamily: "DM Sans, sans-serif",
   },

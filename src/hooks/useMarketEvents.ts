@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Parse from "../lib/parse";
 import { BoothPosition } from "../components/consumer/MarketMap";
-import { parseBoothMap } from "../lib/marketEvents";
+import { deriveWorkflowStatus, EventWorkflowStatus, parseBoothMap } from "../lib/marketEvents";
 
 export interface MarketEvent {
   objectId: string;
@@ -12,6 +12,7 @@ export interface MarketEvent {
   address: string;
   boothMap: BoothPosition[];
   isPublished: boolean;
+  workflowStatus: EventWorkflowStatus;
   notes: string;
 }
 
@@ -37,6 +38,10 @@ export function useMarketEvents() {
           address: r.get("address") ?? "",
           boothMap: parseBoothMap(r.get("boothMap")),
           isPublished: r.get("isPublished") ?? false,
+          workflowStatus: deriveWorkflowStatus(
+            r.get("workflowStatus"),
+            r.get("isPublished") ?? false
+          ),
           notes: r.get("notes") ?? "",
         }))
       );
