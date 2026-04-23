@@ -10,6 +10,8 @@ MarketFlow supports customers, vendors, admins, and owners with event planning, 
 ### Customer experience
 
 - Browse upcoming market events and a visual market map
+- Filter events by date window and vendor category
+- Search maps by vendor name/slug and booth ID
 - View vendor profiles, tags, menus, and reviews
 - Place pre-orders with inventory-aware checkout
 - Track order history and status
@@ -20,16 +22,23 @@ MarketFlow supports customers, vendors, admins, and owners with event planning, 
 - Access vendor dashboard tabs for orders, menu, earnings, and events
 - Manage menu items and inventory counts
 - View assigned booth/event schedule
+- Receive booth assignment/reassignment notifications in dashboard
 - Edit vendor profile and business details
 
 ### Admin experience
 
 - Create and edit market events
+- Use event publishing workflow with validation gates:
+  - `draft -> review -> published`
+  - publish blocks for missing core details, no booth map, map overlaps, or unknown assigned vendors
+  - selected vendors do **not** all need booth assignments to publish
 - Build booth layouts with the advanced map editor:
   - draw/select modes
   - multi-select and box-select
   - drag, resize handles, duplicate, rotate
   - quick vendor assignment (`/` shortcut)
+  - smart assignment suggestions (category + past layout)
+  - supports vendors assigned to multiple booths
   - overlap warnings
   - undo/redo
   - zoom/fit/full-screen and mini navigator
@@ -146,6 +155,7 @@ The app uses the following Parse classes:
 
 - `Vendor` — vendor roster (`isActive: true` required to appear in app)
 - `MarketEvent` — market event dates and booth maps
+- `VendorNotification` — vendor assignment/reassignment notifications
 - `Review` — customer reviews per vendor
 - `Order` — customer orders
 - `MenuItem` — vendor menu items
@@ -164,6 +174,8 @@ Implemented functions:
 - `linkVendorToUser`
 - `updateMyProfile`
 - `createOrderWithInventory`
+- `updateEventWorkflowStatus`
+- `notifyVendorAssignmentChanges`
 
 Key reason for Cloud Code:
 
