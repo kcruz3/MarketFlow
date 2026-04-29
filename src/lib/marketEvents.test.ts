@@ -2,6 +2,7 @@
 
 import {
   deriveWorkflowStatus,
+  getWorkflowTransitionIssues,
   isUpcomingDate,
   parseBoothMap,
   serializeBoothMap,
@@ -164,5 +165,32 @@ describe("marketEvents test harness", () => {
     expect(validation.canSubmitForReview).toBe(true);
     expect(validation.canPublish).toBe(true);
     expect(validation.checklist.allSelectedVendorsAssigned).toBe(false);
+  });
+
+  it("requires review before publish even when publish checks pass", () => {
+    const validation = validateEventForWorkflow({
+      name: "Summer Market",
+      date: "2026-05-01",
+      hours: "10:00 AM - 3:00 PM",
+      address: "1105 Northside Blvd",
+      selectedVendorSlugs: ["vendor-a"],
+      boothMap: [
+        {
+          boothId: "A1",
+          vendorSlug: "vendor-a",
+          vendorName: "Vendor A",
+          category: "Prepared Food",
+          x: 10,
+          y: 10,
+          w: 80,
+          h: 80,
+        },
+      ],
+    });
+
+    expect(getWorkflowTransitionIssues("draft", "published", validation)).toContain(
+      "Send this event to review before publishing."
+    );
+    expect(getWorkflowTransitionIssues("review", "published", validation)).toEqual([]);
   });
 });

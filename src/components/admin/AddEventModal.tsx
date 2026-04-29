@@ -7,6 +7,7 @@ import { BoothPosition } from "../consumer/MarketMap";
 import {
   EventWorkflowStatus,
   formatEventDate,
+  getWorkflowTransitionIssues,
   isUpcomingDate,
   parseBoothMap,
   serializeBoothMap,
@@ -150,8 +151,14 @@ export default function AddEventModal({
     );
   };
 
+  const eventDateForLayout = date ? new Date(date) : null;
+  const layoutReferenceDate =
+    eventDateForLayout && !Number.isNaN(eventDateForLayout.getTime())
+      ? eventDateForLayout
+      : new Date();
   const historicalEvents = allEvents
     .filter((event) => event.objectId !== editEvent?.objectId)
+    .filter((event) => new Date(event.date).getTime() < layoutReferenceDate.getTime())
     .filter((event) => event.boothMap.length > 0)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const latestLayoutEvent = historicalEvents[0] ?? null;
@@ -240,15 +247,20 @@ export default function AddEventModal({
     const desiredStatus = targetStatus || workflowStatus;
     const shouldPublish = desiredStatus === "published";
     const shouldSubmitForReview = desiredStatus === "review";
+    const transitionIssues = getWorkflowTransitionIssues(
+      workflowStatus,
+      desiredStatus,
+      workflowValidation
+    );
 
-    if (shouldSubmitForReview && !workflowValidation.canSubmitForReview) {
-      setError("Complete required details and vendor selection before sending to review.");
-      setShowPublishIssues(true);
-      return;
-    }
-
-    if (shouldPublish && !workflowValidation.canPublish) {
-      setError("This event cannot be published until all validation checks pass.");
+    if (transitionIssues.length > 0) {
+      setError(
+        shouldSubmitForReview
+          ? "Complete required details and vendor selection before sending to review."
+          : shouldPublish
+          ? transitionIssues[0]
+          : transitionIssues.join(" ")
+      );
       setShowPublishIssues(true);
       return;
     }
@@ -258,11 +270,16 @@ export default function AddEventModal({
     try {
       let obj: Parse.Object;
       let previousBoothMap: BoothPosition[] = [];
+      let previousVendorSlugs: string[] = [];
 
       if (isEditing) {
         const q = new Parse.Query("MarketEvent");
         obj = await q.get(editEvent.objectId);
         previousBoothMap = parseBoothMap(obj.get("boothMap"));
+        const existingVendors = await obj.relation("vendors").query().limit(200).find();
+        previousVendorSlugs = existingVendors
+          .map((vendor: any) => String(vendor.get("slug") || "").trim())
+          .filter(Boolean);
       } else {
         const MarketEvent = Parse.Object.extend("MarketEvent");
         obj = new MarketEvent();
@@ -310,6 +327,8 @@ export default function AddEventModal({
       if (isEditing || selectedVendorSlugs.size > 0) {
         await Parse.Cloud.run("notifyVendorAssignmentChanges", {
           eventId: obj.id,
+          previousVendorSlugs,
+          nextVendorSlugs: Array.from(selectedVendorSlugs),
           previousBoothMap,
           nextBoothMap: boothMap,
           eventName: name.trim(),
@@ -865,9 +884,11 @@ export default function AddEventModal({
                     handleSave("published");
                   }}
                   style={s.saveBtn}
-                  disabled={saving || !workflowValidation.canPublish}
+                  disabled={saving || !workflowValidation.canPublish || workflowStatus !== "review"}
                   title={
-                    workflowValidation.canPublish
+                    workflowStatus !== "review"
+                      ? "Submit this event for review before publishing"
+                      : workflowValidation.canPublish
                       ? "Publish event to customer and vendor views"
                       : "Resolve workflow checks before publishing"
                   }

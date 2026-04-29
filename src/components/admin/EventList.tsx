@@ -84,6 +84,12 @@ export default function EventList({ events, onEdit, onStatusChange }: Props) {
                     <button
                       onClick={() => onStatusChange(event, "published")}
                       style={{ ...quickActionBtn, borderColor: "var(--sage-light)" }}
+                      disabled={status !== "review"}
+                      title={
+                        status === "review"
+                          ? "Publish this reviewed event"
+                          : "Send to Review before publishing"
+                      }
                     >
                       Publish
                     </button>

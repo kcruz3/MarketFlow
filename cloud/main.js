@@ -504,6 +504,12 @@ function parseBoothMapForCloud(raw) {
   return [];
 }
 
+function parseSlugListForCloud(raw) {
+  if (!raw) return [];
+  if (!Array.isArray(raw)) return [];
+  return raw.map((slug) => String(slug || "").trim()).filter(Boolean);
+}
+
 function boothOverlaps(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -582,6 +588,19 @@ function validateEventWorkflowState({
   };
 }
 
+function getEventWorkflowTransitionIssues(currentStatus, targetStatus, validation) {
+  if (targetStatus === "draft") return [];
+  if (targetStatus === "review") {
+    return validation.canSubmitForReview ? [] : validation.reviewIssues;
+  }
+
+  const issues = validation.canPublish ? [] : [...validation.publishIssues];
+  if (currentStatus !== "review") {
+    issues.unshift("Send this event to review before publishing.");
+  }
+  return issues;
+}
+
 Parse.Cloud.define("updateEventWorkflowStatus", async (request) => {
   await requireAdminUser(request.user);
 
@@ -618,17 +637,19 @@ Parse.Cloud.define("updateEventWorkflowStatus", async (request) => {
     selectedVendorSlugs,
     boothMap,
   });
+  const currentStatus = String(
+    event.get("workflowStatus") || (event.get("isPublished") ? "published" : "draft")
+  );
+  const transitionIssues = getEventWorkflowTransitionIssues(
+    currentStatus,
+    status,
+    validation
+  );
 
-  if (status === "review" && !validation.canSubmitForReview) {
+  if (transitionIssues.length > 0) {
     throw new Parse.Error(
       Parse.Error.VALIDATION_ERROR,
-      validation.reviewIssues.join(" ")
-    );
-  }
-  if (status === "published" && !validation.canPublish) {
-    throw new Parse.Error(
-      Parse.Error.VALIDATION_ERROR,
-      validation.publishIssues.join(" ")
+      transitionIssues.join(" ")
     );
   }
 
@@ -659,6 +680,8 @@ Parse.Cloud.define("notifyVendorAssignmentChanges", async (request) => {
   const eventDateRaw = request.params?.eventDate;
   const eventAddress = String(request.params?.eventAddress || "").trim();
   const marketHours = String(request.params?.marketHours || "").trim();
+  const previousVendorSlugs = parseSlugListForCloud(request.params?.previousVendorSlugs);
+  const nextVendorSlugs = parseSlugListForCloud(request.params?.nextVendorSlugs);
   const previousBoothMap = parseBoothMapForCloud(request.params?.previousBoothMap);
   const nextBoothMap = parseBoothMapForCloud(request.params?.nextBoothMap);
 
@@ -678,7 +701,9 @@ Parse.Cloud.define("notifyVendorAssignmentChanges", async (request) => {
     nextByVendor.set(slug, String(booth.boothId || "").trim());
   });
 
-  const allVendorSlugs = new Set([...previousByVendor.keys(), ...nextByVendor.keys()]);
+  const previousSelected = new Set([...previousVendorSlugs, ...previousByVendor.keys()]);
+  const nextSelected = new Set([...nextVendorSlugs, ...nextByVendor.keys()]);
+  const allVendorSlugs = new Set([...previousSelected, ...nextSelected]);
   if (allVendorSlugs.size === 0) {
     return { success: true, created: 0 };
   }
@@ -693,7 +718,9 @@ Parse.Cloud.define("notifyVendorAssignmentChanges", async (request) => {
   allVendorSlugs.forEach((slug) => {
     const previousBoothId = previousByVendor.get(slug) || "";
     const boothId = nextByVendor.get(slug) || "";
-    if (previousBoothId === boothId) return;
+    const previousAssignment = previousBoothId || (previousSelected.has(slug) ? "event" : "");
+    const nextAssignment = boothId || (nextSelected.has(slug) ? "event" : "");
+    if (previousAssignment === nextAssignment) return;
 
     const vendor = vendorBySlug.get(slug);
     if (!vendor) return;
@@ -702,13 +729,23 @@ Parse.Cloud.define("notifyVendorAssignmentChanges", async (request) => {
     if (!ownerId) return;
 
     let type = "assigned";
-    let message = `You've been assigned to booth ${boothId}.`;
-    if (previousBoothId && boothId) {
+    let message = boothId
+      ? `You've been assigned to booth ${boothId} for ${eventName || "this market event"}.`
+      : `You've been assigned to ${eventName || "a market event"}.`;
+    if (previousAssignment && nextAssignment) {
       type = "reassigned";
-      message = `Your booth changed from ${previousBoothId} to ${boothId}.`;
-    } else if (previousBoothId && !boothId) {
+      if (previousBoothId && boothId) {
+        message = `Your booth changed from ${previousBoothId} to ${boothId}.`;
+      } else if (!previousBoothId && boothId) {
+        message = `You've been assigned to booth ${boothId} for ${eventName || "this market event"}.`;
+      } else if (previousBoothId && !boothId) {
+        message = `Your booth assignment (${previousBoothId}) was removed, but you're still assigned to ${eventName || "this market event"}.`;
+      }
+    } else if (previousAssignment && !nextAssignment) {
       type = "unassigned";
-      message = `Your booth assignment (${previousBoothId}) was removed.`;
+      message = previousBoothId
+        ? `Your booth assignment (${previousBoothId}) was removed.`
+        : `You've been removed from ${eventName || "this market event"}.`;
     }
 
     const notification = new Parse.Object("VendorNotification");

@@ -27,6 +27,29 @@ export interface EventValidationResult {
   publishIssues: string[];
 }
 
+export function getWorkflowTransitionIssues(
+  currentStatus: EventWorkflowStatus,
+  targetStatus: EventWorkflowStatus,
+  validation: Pick<
+    EventValidationResult,
+    "canSubmitForReview" | "canPublish" | "reviewIssues" | "publishIssues"
+  >
+): string[] {
+  if (targetStatus === "draft") {
+    return [];
+  }
+
+  if (targetStatus === "review") {
+    return validation.canSubmitForReview ? [] : validation.reviewIssues;
+  }
+
+  const issues = validation.canPublish ? [] : [...validation.publishIssues];
+  if (currentStatus !== "review") {
+    issues.unshift("Send this event to review before publishing.");
+  }
+  return issues;
+}
+
 function toValidDate(value: DateValue): Date | null {
   if (!value) {
     return null;

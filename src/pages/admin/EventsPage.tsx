@@ -2,7 +2,12 @@ import React, { useState } from "react";
 import { useMarketEvents, MarketEvent } from "../../hooks/useMarketEvents";
 import EventList from "../../components/admin/EventList";
 import AddEventModal from "../../components/admin/AddEventModal";
-import { parseBoothMap, splitEventsByDate, validateEventForWorkflow } from "../../lib/marketEvents";
+import {
+  getWorkflowTransitionIssues,
+  parseBoothMap,
+  splitEventsByDate,
+  validateEventForWorkflow,
+} from "../../lib/marketEvents";
 import Parse from "../../lib/parse";
 
 export default function EventsPage() {
@@ -66,13 +71,14 @@ export default function EventsPage() {
           selectedVendorSlugs,
           boothMap: parseBoothMap(eventObj.get("boothMap")),
         });
+        const transitionIssues = getWorkflowTransitionIssues(
+          event.workflowStatus,
+          status,
+          validation
+        );
 
-        if (status === "review" && !validation.canSubmitForReview) {
-          window.alert(validation.reviewIssues.join(" "));
-          return;
-        }
-        if (status === "published" && !validation.canPublish) {
-          window.alert(validation.publishIssues.join(" "));
+        if (transitionIssues.length > 0) {
+          window.alert(transitionIssues.join(" "));
           return;
         }
 

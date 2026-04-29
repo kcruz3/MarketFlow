@@ -704,7 +704,7 @@ export default function VendorDashboard() {
                   <div className="loading-spinner">Loading notifications...</div>
                 ) : notifications.length === 0 ? (
                   <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                    Assignment updates will appear here when you are assigned or moved to a booth.
+                    Assignment updates will appear here when you are added to an event or moved to a booth.
                   </div>
                 ) : (
                   <div style={{ display: "grid", gap: 10 }}>

@@ -5,6 +5,13 @@ MarketFlow supports customers, vendors, admins, and owners with event planning, 
 
 **Group:** Kathryn Cruz, Dan Huss, Christian Dunne
 
+## User Stories
+
+- As an admin, I want a `draft -> review -> publish` workflow with validation checks, so I can avoid publishing incomplete events/maps.
+- As an admin, I want suggested booth assignments based on vendor category and past layout, so I can build maps faster with fewer manual edits.
+- As a customer, I want event filters by date/category and map search by vendor name/booth, so I can quickly find who I need on market day.
+- As a vendor, I want to be notified when I'm assigned or reassigned to a booth or event, so I can prepare inventory and staffing early.
+
 ## What The App Does
 
 ### Customer experience
@@ -22,7 +29,7 @@ MarketFlow supports customers, vendors, admins, and owners with event planning, 
 - Access vendor dashboard tabs for orders, menu, earnings, and events
 - Manage menu items and inventory counts
 - View assigned booth/event schedule
-- Receive booth assignment/reassignment notifications in dashboard
+- Receive event assignment, booth assignment, reassignment, and removal notifications in dashboard
 - Edit vendor profile and business details
 
 ### Admin experience
@@ -30,6 +37,7 @@ MarketFlow supports customers, vendors, admins, and owners with event planning, 
 - Create and edit market events
 - Use event publishing workflow with validation gates:
   - `draft -> review -> published`
+  - publish is only available after an event is sent to review
   - publish blocks for missing core details, no booth map, map overlaps, or unknown assigned vendors
   - selected vendors do **not** all need booth assignments to publish
 - Build booth layouts with the advanced map editor:
@@ -37,7 +45,7 @@ MarketFlow supports customers, vendors, admins, and owners with event planning, 
   - multi-select and box-select
   - drag, resize handles, duplicate, rotate
   - quick vendor assignment (`/` shortcut)
-  - smart assignment suggestions (category + past layout)
+  - smart assignment suggestions (vendor category + prior event layout)
   - supports vendors assigned to multiple booths
   - overlap warnings
   - undo/redo
@@ -180,7 +188,9 @@ Implemented functions:
 Key reason for Cloud Code:
 
 - Enforce role checks and secure owner/admin workflows
+- Enforce the event workflow sequence server-side
 - Reserve and decrement inventory server-side at checkout
+- Create vendor event/booth assignment notifications with per-vendor ACLs
 - Keep sensitive operations out of client-only logic
 
 To deploy it to Back4App:
